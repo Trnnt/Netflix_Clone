@@ -79,20 +79,55 @@ export const MOVIES = [
         poster: "https://image.tmdb.org/t/p/w500/jsWPPKmQBGPLLv5HdNomHaJOT0n.jpg",
         backdrop: "https://image.tmdb.org/t/p/w1280/h4JoYHCHLcRTU3MoWAIJO1VQU2s.jpg",
         tags: ["Fantasy", "Romance", "Comedy"], section: "kdrama"
+    },
+    {
+        id: 10, title: "Put Your Head on My Shoulder", year: 2019, rating: 8.1, category: "CDrama",
+        genre: "Romance • Youth", cast: "Xing Fei, Lin Yi",
+        desc: "As Si Tu Mo's graduation is nearing, she is confused about her future plans. She ends up living with a physics genius.",
+        maturity: "U/A 13+", episodes: "1 Season", match: 95,
+        poster: "https://image.tmdb.org/t/p/w500/z6hY8f7R8q8A8oZq0wZp8r9X0X6.jpg",
+        backdrop: "https://image.tmdb.org/t/p/w1280/u6hY8f7R8q8A8oZq0wZp8r9X0X6.jpg",
+        tags: ["Romance", "Youth", "C-Drama"], section: "cdrama"
+    },
+    {
+        id: 11, title: "Love is Sweet", year: 2020, rating: 8.4, category: "CDrama",
+        genre: "Romance • Business", cast: "Luo Yunxi, Bai Lu",
+        desc: "Jiang Jun meets her childhood playmate, Yuan Shuai, in the workplace. However, he is no longer her gentle protector but a rival.",
+        maturity: "U/A 13+", episodes: "1 Season", match: 92,
+        poster: "https://image.tmdb.org/t/p/w500/v6hY8f7R8q8A8oZq0wZp8r9X0X6.jpg",
+        backdrop: "https://image.tmdb.org/t/p/w1280/v6hY8f7R8q8A8oZq0wZp8r9X0X6.jpg",
+        tags: ["Romance", "Business", "C-Drama"], section: "cdrama"
+    },
+    {
+        id: 12, title: "Weak Hero Class 2", year: 2026, rating: 8.9, category: "KDrama",
+        genre: "Action • Noir", cast: "Park Ji-hoon",
+        desc: "Yeon Shi-eun transfers to a new school where he enters a more vicious world of violence.",
+        maturity: "A", episodes: "8 Episodes", match: 98,
+        poster: "https://image.tmdb.org/t/p/w500/w6hY8f7R8q8A8oZq0wZp8r9X0X6.jpg",
+        backdrop: "https://image.tmdb.org/t/p/w1280/w6hY8f7R8q8A8oZq0wZp8r9X0X6.jpg",
+        tags: ["Action", "Noir", "Season 2"], section: "trending"
+    },
+    {
+        id: 13, title: "Solo Leveling: Arise", year: 2026, rating: 9.2, category: "Anime",
+        genre: "Action • Isekai", cast: "Jin-Woo Sung",
+        desc: "The world's weakest hunter becomes the world's strongest in this epic continuation of the leveling journey.",
+        maturity: "A", episodes: "24 Episodes", match: 99,
+        poster: "https://image.tmdb.org/t/p/w500/x6hY8f7R8q8A8oZq0wZp8r9X0X6.jpg",
+        backdrop: "https://image.tmdb.org/t/p/w1280/x6hY8f7R8q8A8oZq0wZp8r9X0X6.jpg",
+        tags: ["Action", "Isekai", "2026"], section: "anime"
     }
 ];
 
 // Replicate arrays to make row slider more impressive
-export const dupes = (arr, times) => Array(times).fill([...arr]).flat().map((item, i) => ({ ...item, uniqueId: item.id + '-' + i }));
+export const dupes = (arr, times) => Array(times).fill([...arr]).flat().map((item, i) => ({ ...item, uniqueId: (item.id || i) + '-' + i }));
 
 export const rows = {
-    trending: dupes(MOVIES.filter(m => m.section === "trending"), 5),
-    picks: dupes(MOVIES.filter(m => m.section === "picks"), 5),
-    anime: dupes(MOVIES.filter(m => m.section === "anime"), 5),
-    kdrama: dupes(MOVIES.filter(m => m.section === "kdrama"), 5),
-    hollywood: dupes(MOVIES.filter(m => m.section === "trending"), 5),
-    wollywood: dupes(MOVIES.filter(m => m.section === "picks"), 5),
-    cdrama: dupes(MOVIES.filter(m => m.section === "kdrama"), 5),
-    jdrama: dupes(MOVIES.filter(m => m.section === "anime"), 5),
-    cartoon: dupes(MOVIES.filter(m => m.section === "anime"), 5),
+    trending: dupes(MOVIES.filter(m => m.section === "trending"), 3),
+    picks: dupes(MOVIES.filter(m => m.section === "picks"), 3),
+    anime: dupes(MOVIES.filter(m => m.section === "anime"), 3),
+    kdrama: dupes(MOVIES.filter(m => m.section === "kdrama"), 3),
+    cdrama: dupes(MOVIES.filter(m => m.category === "CDrama"), 3),
+    hollywood: dupes(MOVIES.filter(m => m.category === "Movie"), 3),
+    cartoon: dupes(MOVIES.filter(m => m.category === "Anime").slice(0, 2), 3),
 };
+

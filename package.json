@@ -10,7 +10,8 @@
   "dependencies": {
     "lucide-react": "^0.576.0",
     "react": "latest",
-    "react-dom": "latest"
+    "react-dom": "latest",
+    "socket.io-client": "^4.8.3"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "latest",

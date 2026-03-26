@@ -58,6 +58,7 @@ function AdminDashboard({ onLogout }) {
     const [stats, setStats] = useState({});
     const [loading, setLoading] = useState(true);
     const [msg, setMsg] = useState('');
+    const [liveLogs, setLiveLogs] = useState([]);
 
     const token = () => localStorage.getItem('netflix_token') || '';
 
@@ -89,7 +90,21 @@ function AdminDashboard({ onLogout }) {
         setLoading(false);
     };
 
-    useEffect(() => { load(); }, []);
+    useEffect(() => {
+        load();
+        import('../services/movieApi.js').then(({ socket }) => {
+            socket.on('admin_live_update', (data) => {
+                let action = '';
+                if (data.type === 'login') action = `${data.user?.name || 'A user'} logged in.`;
+                else if (data.type === 'watch') action = `${data.user?.name || 'A user'} started watching ${data.movie_title}.`;
+                else if (data.type === 'download') action = `${data.user?.name || 'A user'} downloaded ${data.movie_title}.`;
+
+                if (action) {
+                    setLiveLogs(prev => [`[${new Date(data.timestamp).toLocaleTimeString()}] 🟢 LIVE: ${action}`, ...prev].slice(0, 50));
+                }
+            });
+        });
+    }, []);
 
     const handlePlan = async (id, plan, status) => {
         try { await api(`/api/admin/users/${id}`, { method: 'PUT', body: JSON.stringify({ plan, status }) }); setMsg('✅ User updated!'); load(); } catch (e) { setMsg('⚠️ ' + e.message); }
@@ -243,13 +258,16 @@ function AdminDashboard({ onLogout }) {
             case 'logs':
                 return (
                     <div className="admin-section animate-fade">
-                        <h2>Infrastructure Logs</h2>
+                        <h2>Real-Time Live Tracking</h2>
                         <div className="viz-card full-width log-console">
-                            <div className="log-entry"><span>[{new Date().toISOString().slice(0, 19)}]</span> INFO: Admin panel accessed</div>
-                            <div className="log-entry"><span>[{new Date().toISOString().slice(0, 19)}]</span> INFO: {stats.totalUsers || 0} users in database</div>
-                            <div className="log-entry"><span>[{new Date().toISOString().slice(0, 19)}]</span> INFO: {stats.activeUsers || 0} active users</div>
-                            <div className="log-entry"><span>[{new Date().toISOString().slice(0, 19)}]</span> INFO: {stats.totalWatchHours || 0}h total watch hours logged</div>
-                            <div className="log-entry"><span>[{new Date().toISOString().slice(0, 19)}]</span> SUCCESS: Real-time DB sync active</div>
+                            {liveLogs.length === 0 && <div className="log-entry" style={{ opacity: .5 }}>Listening for live user events... 👀</div>}
+                            {liveLogs.map((log, i) => <div key={i} className="log-entry" style={{ color: '#46d369' }}>{log}</div>)}
+                            <br />
+                            <div className="log-entry" style={{ opacity: .5 }}><span>[{new Date().toISOString().slice(0, 19)}]</span> INFO: Admin panel accessed</div>
+                            <div className="log-entry" style={{ opacity: .5 }}><span>[{new Date().toISOString().slice(0, 19)}]</span> INFO: {stats.totalUsers || 0} users in database</div>
+                            <div className="log-entry" style={{ opacity: .5 }}><span>[{new Date().toISOString().slice(0, 19)}]</span> INFO: {stats.activeUsers || 0} active users</div>
+                            <div className="log-entry" style={{ opacity: .5 }}><span>[{new Date().toISOString().slice(0, 19)}]</span> INFO: {stats.totalWatchHours || 0}h total watch hours logged</div>
+                            <div className="log-entry" style={{ opacity: .5 }}><span>[{new Date().toISOString().slice(0, 19)}]</span> SUCCESS: Real-time DB sync active</div>
                         </div>
                     </div>
                 );
@@ -373,6 +391,10 @@ export default function LoginPage({ onLogin, isAdminView: forceAdminView }) {
             }
             localStorage.setItem('netflix_token', data.token);
             localStorage.setItem('netflix_user', JSON.stringify(data.user));
+
+            // 📡 Socket.io Live Telemetry
+            import('../services/movieApi.js').then(({ trackLogin }) => trackLogin(data.user)).catch(() => { });
+
             onLogin(); // Trigger App recheck
         } catch (err) {
             setError(err.message);
@@ -387,11 +409,33 @@ export default function LoginPage({ onLogin, isAdminView: forceAdminView }) {
 
     return (
         <div className="login-page">
+            <style>{`
+                .rimuru-logo {
+                    font-size: 45px;
+                    font-weight: 950;
+                    letter-spacing: -2px;
+                    background: linear-gradient(135deg, #e50914 0%, #7c3aed 50%, #3b82f6 100%);
+                    -webkit-background-clip: text;
+                    -webkit-text-fill-color: transparent;
+                    filter: drop-shadow(0 0 15px rgba(124,58,237,0.4));
+                    animation: rimuruIntro 1.2s cubic-bezier(0.2, 0, 0.2, 1) forwards;
+                    user-select: none;
+                    cursor: default;
+                }
+                @keyframes rimuruIntro {
+                    0% { transform: scale(1.5); filter: blur(20px) brightness(2); opacity: 0; letter-spacing: 20px; }
+                    60% { transform: scale(1.1); filter: blur(0px) brightness(1.2); opacity: 1; letter-spacing: -2px; }
+                    100% { transform: scale(1); filter: blur(0px) brightness(1); opacity: 1; letter-spacing: -2px; }
+                }
+                .login-signup-now a { color: #7c3aed !important; }
+                .login-btn { background: linear-gradient(90deg, #e50914, #7c3aed) !important; border: none !important; }
+                .login-btn:hover { filter: brightness(1.1); transform: scale(1.02); }
+            `}</style>
             <div className="login-bg">
                 <img src="https://assets.nflxext.com/FFE/siteui/vlv3/f841d4c7-10e1-40af-bcae-07a3f8dc141a/f6d7434e-d6de-4185-a6d4-c77a2d08737b/US-en-20220502-popsignuptwoweeks-perspective_alpha_website_medium.jpg" alt="Background" />
             </div>
             <header className="login-header">
-                <img src="https://upload.wikimedia.org/wikipedia/commons/0/08/Netflix_2015_logo.svg" alt="Netflix" className="logo" />
+                <div className="rimuru-logo">RIMURU</div>
             </header>
             <div className="login-body">
                 <div className="login-form-wrapper">
@@ -413,19 +457,19 @@ export default function LoginPage({ onLogin, isAdminView: forceAdminView }) {
                         <div className="input-group">
                             <input type="password" placeholder="Password" required minLength={6} value={password} onChange={e => setPassword(e.target.value)} />
                         </div>
-                        <button type="submit" className="login-btn" disabled={loading}>
+                        <button type="submit" className="login-btn" disabled={loading} style={{ transition: 'all 0.3s' }}>
                             {loading ? '⏳ Please wait...' : mode === 'register' ? 'Create Account' : 'Sign In'}
                         </button>
                     </form>
                     <div className="login-bottom" style={{ marginTop: 20 }}>
                         <p className="login-signup-now">
-                            {mode === 'login' ? 'New to Netflix? ' : 'Already have an account? '}
+                            {mode === 'login' ? 'New to Rimuru? ' : 'Already have an account? '}
                             <a href="#" onClick={e => { e.preventDefault(); setMode(m => m === 'login' ? 'register' : 'login'); setError(''); }}>
                                 {mode === 'login' ? 'Sign up now' : 'Sign in'}
                             </a>
                         </p>
                         <div style={{ marginTop: 15, textAlign: 'center', borderTop: '1px solid #333', paddingTop: 15 }}>
-                            <button onClick={(e) => { e.preventDefault(); setEmail('admin@netflix.com'); setPassword('admin123'); setMode('login'); }} style={{ background: '#333', color: 'white', padding: '10px 15px', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: 13, width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontWeight: 'bold' }}>
+                            <button onClick={(e) => { e.preventDefault(); setEmail('admin@rimuru.com'); setPassword('admin123'); setMode('login'); }} style={{ background: '#333', color: 'white', padding: '10px 15px', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: 13, width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontWeight: 'bold' }}>
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /></svg>
                                 Access Admin Panel
                             </button>

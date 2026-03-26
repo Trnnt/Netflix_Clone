@@ -1,4 +1,31 @@
+import { io } from 'socket.io-client';
+
 const BASE = 'http://localhost:5000/api';
+export const socket = io('http://localhost:5000');
+
+// Tracking Helpers
+export const trackLogin = (user) => socket.emit('user_login', { user });
+export const trackDownload = (user, movie) => socket.emit('user_download', { user, movie_title: movie.title || movie.name });
+
+export const trackWatch = (user, movie, { season = null, episode = null } = {}) => {
+    socket.emit('user_watch', { user, movie_title: movie.title || movie.name });
+    // Also persist to DB for profile activity
+    const tok = localStorage.getItem('netflix_token');
+    if (!tok) return;
+    fetch(`${BASE}/watch`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tok}` },
+        body: JSON.stringify({
+            movie_id: String(movie.id || movie.movie_id || Math.random()),
+            movie_title: movie.title || movie.name || movie.movie_title || 'Unknown',
+            movie_thumbnail: movie.thumbnail || movie.movie_thumbnail || '',
+            duration_min: 1,
+            season: season,
+            episode: episode,
+        }),
+    }).catch(() => { }); // fire-and-forget
+};
+
 
 // Get token from localStorage
 const token = () => localStorage.getItem('netflix_token') || '';

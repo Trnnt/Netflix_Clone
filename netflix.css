@@ -466,6 +466,29 @@ button { font-family: inherit; cursor: pointer; }
 .cat-btn:hover { background: rgba(255,255,255,0.18); color: var(--white); }
 .cat-btn.active { background: var(--red); border-color: var(--red); color: var(--white); font-weight: 700; }
 
+/* Category Separator (for both Navbar and CategoryBar) */
+.cat-btn[data-cat="Anime"] + .cat-btn[data-cat="Cartoon"]::before,
+.nav-links li[data-cat="Anime"] + li[data-cat="Cartoon"]::before {
+    content: '';
+    display: inline-block;
+    width: 1px;
+    height: 18px;
+    background: rgba(255,255,255,0.22);
+    margin-right: 14px;
+    margin-left: 4px;
+    vertical-align: middle;
+}
+
+/* Mobile Menu Separator */
+.mobile-menu-item[data-cat="Anime"] + .mobile-menu-item[data-cat="Cartoon"]::before {
+    content: '';
+    display: block;
+    height: 1px;
+    background: rgba(255,255,255,0.1);
+    margin: 8px 0;
+}
+
+
 /* ══════════════════════════════════════════════════════════
    MOVIE ROWS
    ══════════════════════════════════════════════════════════ */

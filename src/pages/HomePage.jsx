@@ -1,7 +1,12 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import { trackWatch, trackDownload, getCurrentUser } from "../services/movieApi.js";
 import { Play, Info, Plus, ThumbsUp, Bell, Search, ChevronLeft, ChevronRight, X, Volume2, VolumeX, Star, Clock, Download, Share2, Bookmark, Film, User, Users, Settings, LogOut, Menu, Sparkles, Check } from "lucide-react";
+import AiChat from "../components/AiChat.jsx";
 
-/* ─── API ──────────────────────────────────────────────────── */
+/* ─── API & TOAST ────────────────────────────────────────── */
+export const toastEvent = new EventTarget();
+export const showToast = (msg) => toastEvent.dispatchEvent(new CustomEvent('toast', { detail: msg }));
+
 const API = 'http://localhost:5000/api';
 async function apiFetch(path) {
   const res = await fetch(API + path);
@@ -117,21 +122,24 @@ function Navbar({ scrolled, category, setCategory, onSearch, setActiveModal, onL
   }, [onSearch]);
   const profMenu = [
     { icon: <User size={14} />, label: "Edit Profile", modal: "profile" },
-    { icon: <Bookmark size={14} />, label: "My List", modal: "mylist" },
+    { icon: <Bookmark size={14} />, label: "Watchlist", modal: "mylist" },
     { icon: <Download size={14} />, label: "Downloads", modal: "downloads" },
     { icon: <Settings size={14} />, label: "Settings", modal: "settings" },
     { icon: <LogOut size={14} />, label: "Sign Out", modal: "signout" },
   ];
+  const user = JSON.parse(localStorage.getItem('netflix_user') || '{"name": "User"}');
+  
   return (
     <nav className={"nb" + (scrolled ? " sc" : "")}>
       <div className="nb-l">
-        <div className="logo" onClick={() => setCategory("Home")}><span className="ln">N</span><span className="le">ETFLIX</span></div>
+        <div className="logo" onClick={() => setCategory("Home")}><span className="le" style={{ fontSize: 28, letterSpacing: 1, fontWeight: 900, background: 'linear-gradient(to right, #e50914, #7c3aed)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>RIMURU</span></div>
         <ul className="nl">
           {NAV_ITEMS.map(c => (
-            <li key={c} className={category === c ? "act" : ""} onMouseEnter={() => setHov(c)} onMouseLeave={() => setHov(null)} onClick={() => setCategory(c)}>
+            <li key={c} data-cat={c} className={category === c ? "act" : ""} onMouseEnter={() => setHov(c)} onMouseLeave={() => setHov(null)} onClick={() => setCategory(c)}>
               {c}<span className={"nul" + (hov === c || category === c ? " vis" : "")} />
             </li>
           ))}
+
         </ul>
         <button className="mob-hbg" onClick={() => setMobOpen(m => !m)}><Menu size={20} /></button>
       </div>
@@ -150,11 +158,11 @@ function Navbar({ scrolled, category, setCategory, onSearch, setActiveModal, onL
         <div ref={pr} className="drop-a">
           <button className="pb" onClick={() => { setProfOpen(p => !p); setNotifOpen(false); }}>
             <img src="https://upload.wikimedia.org/wikipedia/commons/0/0b/Netflix-avatar.png" className="av" alt="av" />
-            <span className="an">Nishant</span>
+            <span className="an">{user.name}</span>
             <ChevronLeft size={13} style={{ transform: profOpen ? "rotate(-90deg)" : "rotate(-180deg)", transition: "transform .3s" }} />
           </button>
           {profOpen && <div className="dd pdd">
-            <div className="ph"><img src="https://upload.wikimedia.org/wikipedia/commons/0/0b/Netflix-avatar.png" width={40} style={{ borderRadius: 4 }} alt="av" /><div><p className="phn">Nishant</p><p className="php">Premium · 4K HDR</p></div></div>
+            <div className="ph"><img src="https://upload.wikimedia.org/wikipedia/commons/0/0b/Netflix-avatar.png" width={40} style={{ borderRadius: 4 }} alt="av" /><div><p className="phn">{user.name}</p><p className="php">Premium · 4K HDR</p></div></div>
             {profMenu.map(item => (
               <button key={item.label} className={"pmi" + (item.modal === "signout" ? " so" : "")} onClick={() => {
                 setProfOpen(false);
@@ -173,7 +181,7 @@ function Navbar({ scrolled, category, setCategory, onSearch, setActiveModal, onL
           </div>}
         </div>
       </div>
-      {mobOpen && <div className="mm">{NAV_ITEMS.map(c => <button key={c} className={"mmi" + (category === c ? " act" : "")} onClick={() => { setCategory(c); setMobOpen(false); }}>{c}</button>)}</div>}
+      {mobOpen && <div className="mm">{NAV_ITEMS.map(c => <button key={c} data-cat={c} className={"mmi" + (category === c ? " act" : "")} onClick={() => { setCategory(c); setMobOpen(false); }}>{c}</button>)}</div>}
     </nav>
   );
 }
@@ -183,20 +191,68 @@ function GenreStrip({ active, setActive }) {
   return (
     <div className="gs">
       {GENRES.map(g => (
-        <button key={g.key} className={"gc" + (active === g.key ? " gca" : "")} onClick={() => setActive(p => p === g.key ? null : g.key)}>
+        <button key={g.key} data-cat={g.label} className={"gc" + (active === g.key ? " gca" : "")} onClick={() => setActive(p => p === g.key ? null : g.key)}>
           <span className="ge">{g.emoji}</span><span className="gl">{g.label}</span><span className="gu" />
         </button>
       ))}
+
     </div>
   );
 }
 
 /* ─── HERO ───────────────────────────────────────────────── */
-function Hero({ movie, onOpen, onPlay }) {
+function Hero({ movie, onOpen, onPlay, heroIdx, heroCount, onDotClick }) {
   const [muted, setMuted] = useState(true);
   const [prog, setProg] = useState(0);
+  const [inList, setInList] = useState(false);
+  const [liked, setLiked] = useState(false);
+  const [listAnim, setListAnim] = useState(false);
+  const [likeAnim, setLikeAnim] = useState(false);
+
   useEffect(() => { setProg(0); const t = setInterval(() => setProg(p => Math.min(p + 1, 100)), 80); return () => clearInterval(t); }, [movie]);
+
+  useEffect(() => {
+    if (!movie) return;
+    authFetch(`/mylist/check/${movie.id}`).then(r => setInList(r.inList)).catch(() => {});
+    authFetch(`/likes/${movie.id}/check`).then(r => setLiked(r.liked)).catch(() => {});
+  }, [movie?.id]);
+
   if (!movie || !movie.title) return null;
+
+  const handleAdd = async () => {
+    try {
+      const genre = (movie.tags || [])[0] || movie.genre || '';
+      const body = JSON.stringify({ 
+        movie_id: movie.id, movie_title: movie.title, movie_thumbnail: movie.thumbnail, 
+        movie_year: movie.year || '', movie_rating: movie.rating || '', movie_genre: genre 
+      });
+      if (inList) {
+        await authFetch(`/mylist/${movie.id}`, { method: 'DELETE' });
+        setInList(false); showToast('Removed from Watchlist');
+      } else {
+        await authFetch('/mylist', { method: 'POST', body });
+        await authFetch('/downloads', { method: 'POST', body }).catch(() => {});
+        setInList(true); setListAnim(true); setTimeout(() => setListAnim(false), 600);
+        showToast('✅ Added to Watchlist!');
+        const u = getCurrentUser(); if (u) trackDownload(u, movie);
+      }
+    } catch { showToast('⚠️ Sign in to add to Watchlist'); }
+  };
+
+  const handleLike = async () => {
+    try {
+      const genre = (movie.tags || [])[0] || movie.genre || '';
+      if (liked) {
+        await authFetch(`/likes/${movie.id}`, { method: 'DELETE' });
+        setLiked(false); showToast('Removed from Liked');
+      } else {
+        await authFetch('/likes', { method: 'POST', body: JSON.stringify({ movie_id: movie.id, movie_title: movie.title, movie_thumbnail: movie.thumbnail, movie_year: movie.year || '', movie_genre: genre }) });
+        setLiked(true); setLikeAnim(true); setTimeout(() => setLikeAnim(false), 600);
+        showToast('❤️ Added to Liked!');
+      }
+    } catch { showToast('⚠️ Sign in to like'); }
+  };
+
   return (
     <div className="hero">
       <div className="hero-bg" style={{ backgroundImage: "url('" + movie.backdrop + "')" }} />
@@ -216,23 +272,22 @@ function Hero({ movie, onOpen, onPlay }) {
         <div className="hacts">
           <button className="bplay" onClick={() => onPlay(movie)}><Play fill="#000" size={20} /> Play</button>
           <button className="bmore" onClick={() => onOpen(movie)}><Info size={18} /> More Info</button>
-          <button className="badd" onClick={async () => {
-            try {
-              await authFetch('/mylist', {
-                method: 'POST',
-                body: JSON.stringify({
-                  movieId: movie.id, movieTitle: movie.title, movieThumbnail: movie.thumbnail,
-                  movieYear: movie.year || '', movieRating: movie.rating || ''
-                })
-              });
-              alert('Added to My List');
-            } catch (err) { alert('Sign in to add to list'); }
-          }}><Plus size={18} /></button>
+          <button className="badd" onClick={handleAdd} title={inList ? 'Remove from Watchlist' : 'Add to Watchlist'}
+            style={{ background: inList ? 'rgba(70,211,105,0.2)' : 'rgba(255,255,255,0.15)', border: inList ? '2px solid #46d369' : '2px solid rgba(255,255,255,0.5)', transform: listAnim ? 'scale(1.3)' : 'scale(1)', transition: 'all 0.25s cubic-bezier(.34,1.56,.64,1)' }}>
+            {inList ? <Check size={18} color="#46d369" /> : <Plus size={18} />}
+          </button>
+          <button onClick={handleLike} title={liked ? 'Unlike' : 'Like'}
+            style={{ width: 44, height: 44, borderRadius: '50%', border: liked ? '2px solid #e50914' : '2px solid rgba(255,255,255,0.5)', background: liked ? 'rgba(229,9,20,0.2)' : 'rgba(255,255,255,0.15)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: liked ? '#e50914' : '#fff', transform: likeAnim ? 'scale(1.35)' : 'scale(1)', transition: 'all 0.25s cubic-bezier(.34,1.56,.64,1)' }}>
+            <ThumbsUp size={18} fill={liked ? '#e50914' : 'none'} />
+          </button>
         </div>
         <div className="hpb"><div style={{ width: prog + "%", height: "100%", background: "#e50914", borderRadius: 2, transition: "width .08s linear" }} /></div>
       </div>
       <button className="hmute" onClick={() => setMuted(m => !m)}>{muted ? <VolumeX size={16} /> : <Volume2 size={16} />}</button>
       <div className="hmatb">{movie.maturity}</div>
+      {heroCount > 1 && <div className="hero-dots">{Array.from({length: heroCount}, (_, i) => (
+        <button key={i} className={"hero-dot" + (i === heroIdx ? " active" : "")} onClick={e => { e.stopPropagation(); onDotClick(i); }} />
+      ))}</div>}
     </div>
   );
 }
@@ -241,39 +296,53 @@ function Hero({ movie, onOpen, onPlay }) {
 function Card({ movie, onOpen, onPlay, rank, pos }) {
   const [hov, setHov] = useState(false);
   const [list, setList] = useState(false);
+  const [listAnim, setListAnim] = useState(false);
+  const [liked, setLiked] = useState(false);
+  const [likeAnim, setLikeAnim] = useState(false);
   const timer = useRef(null);
 
-  // Check if already in list on hover
+  // Check if already in list/liked on hover
   useEffect(() => {
     if (hov) {
-      authFetch(`/mylist/check/${movie.id}`)
-        .then(res => setList(res.inList))
-        .catch(() => { });
+      authFetch(`/mylist/check/${movie.id}`).then(res => setList(res.inList)).catch(() => { });
+      authFetch(`/likes/${movie.id}/check`).then(res => setLiked(res.liked)).catch(() => { });
     }
   }, [hov, movie.id]);
 
   const toggleList = async (e) => {
     e.stopPropagation();
     try {
+      const genre = (movie.tags || [])[0] || movie.genre || '';
       if (list) {
         await authFetch(`/mylist/${movie.id}`, { method: 'DELETE' });
         setList(false);
       } else {
-        await authFetch('/mylist', {
-          method: 'POST',
-          body: JSON.stringify({
-            movieId: movie.id,
-            movieTitle: movie.title,
-            movieThumbnail: movie.thumbnail,
-            movieYear: movie.year || movie.release_date || '',
-            movieRating: movie.rating || ''
-          })
+        const body = JSON.stringify({
+          movie_id: movie.id, movie_title: movie.title, movie_thumbnail: movie.thumbnail,
+          movie_year: movie.year || '', movie_rating: movie.rating || '', movie_genre: genre
         });
-        setList(true);
+        await authFetch('/mylist', { method: 'POST', body });
+        await authFetch('/downloads', { method: 'POST', body }).catch(() => { });
+        setList(true); setListAnim(true); setTimeout(() => setListAnim(false), 600);
+        showToast('✅ Added to Watchlist!');
+        const u = getCurrentUser(); if (u) trackDownload(u, movie);
       }
-    } catch (err) {
-      console.warn('Login to manage list');
-    }
+    } catch { showToast('⚠️ Sign in to manage list'); }
+  };
+
+  const toggleLike = async (e) => {
+    e.stopPropagation();
+    try {
+      const genre = (movie.tags || [])[0] || movie.genre || '';
+      if (liked) {
+        await authFetch(`/likes/${movie.id}`, { method: 'DELETE' });
+        setLiked(false);
+      } else {
+        await authFetch('/likes', { method: 'POST', body: JSON.stringify({ movie_id: movie.id, movie_title: movie.title, movie_thumbnail: movie.thumbnail, movie_year: movie.year || '', movie_genre: genre }) });
+        setLiked(true); setLikeAnim(true); setTimeout(() => setLikeAnim(false), 600);
+        showToast('❤️ Liked!');
+      }
+    } catch { showToast('⚠️ Sign in to like'); }
   };
 
   const origin = pos === 'first' ? '0% 50%' : pos === 'last' ? '100% 50%' : '50% 50%';
@@ -286,14 +355,21 @@ function Card({ movie, onOpen, onPlay, rank, pos }) {
       <div className="cib">
         <img src={movie.thumbnail} alt={movie.title} className="cimg" onError={e => { e.target.src = "https://via.placeholder.com/400x225/141414/e50914?text=" + encodeURIComponent(movie.title || '?'); }} />
         <div className="cgr" />
+        <div className="card-play-ov"><Play size={26} fill="#fff" color="#fff" /></div>
+        <div className="card-hd-badge">HD</div>
+        {movie.match >= 95 && <div className="card-new-badge">🔥 HOT</div>}
+        {rank && rank <= 3 && <div className="card-top-badge">TOP {rank}</div>}
         <div className="crat"><Star size={10} fill="#f6c90e" color="#f6c90e" /> {movie.rating}</div>
       </div>
       <div className="chov-c">
         <h4 className="cname">{movie.title}</h4>
         <div className="cacts">
           <button className="caplay" onClick={e => { e.stopPropagation(); onPlay && onPlay(movie); }}><Play size={13} fill="#000" /></button>
-          <button className="caico" onClick={toggleList}>{list ? <Check size={14} /> : <Plus size={14} />}</button>
-          <button className="caico" onClick={e => e.stopPropagation()}><ThumbsUp size={13} /></button>
+          <button className="caico" onClick={toggleList} style={{ transform: listAnim ? 'scale(1.4)' : 'scale(1)', transition: 'transform 0.25s cubic-bezier(.34,1.56,.64,1)' }}>
+            {list ? <Check size={14} color="#46d369" /> : <Plus size={14} />}
+          </button>
+          <button className="caico" style={{ color: liked ? '#e50914' : 'inherit', transform: likeAnim ? 'scale(1.4)' : 'scale(1)', transition: 'transform 0.25s cubic-bezier(.34,1.56,.64,1)' }} onClick={toggleLike}><ThumbsUp size={13} fill={liked ? '#e50914' : 'none'} /></button>
+          <button className="caico" onClick={e => { e.stopPropagation(); const src = getVideoForMovie(movie); const a = document.createElement('a'); a.href = src.url; a.download = (movie.title || 'movie') + '.mp4'; a.click(); showToast('⬇️ Download started!'); }} title="Download"><Download size={13} /></button>
           <button className="caico cainfo" onClick={e => { e.stopPropagation(); onOpen(movie); }}><Info size={13} /></button>
         </div>
         <div className="cmeta">
@@ -318,7 +394,7 @@ function Row({ title, movies, onOpen, onPlay, rank }) {
   const scroll = d => { ref.current.scrollBy({ left: d * 840, behavior: "smooth" }); setTimeout(upd, 420); };
   return (
     <section className="row">
-      <div className="rowh"><h3 className="rowt">{title}</h3><button className="rowsa">See All →</button></div>
+      <div className="rowh"><h3 className="rowt">{title}</h3><button className="rowsa" onClick={() => { const e = new CustomEvent('seeAll', { detail: { title, movies } }); window.dispatchEvent(e); }}>See All →</button></div>
       <div className="roww">
         {cl && <button className="arr al" onClick={() => scroll(-1)}><ChevronLeft size={22} /></button>}
         <div className="rscr" ref={ref} onScroll={upd}>
@@ -385,7 +461,13 @@ function VideoPlayer({ movie, onClose }) {
     hideTimer.current = setTimeout(() => { if (playing) setShowCtrl(false); }, 3000);
   };
 
-  useEffect(() => { resetHide(); }, [playing]);
+  useEffect(() => {
+    resetHide();
+    if (playing && movie) {
+      const u = getCurrentUser();
+      if (u) trackWatch(u, movie);
+    }
+  }, [playing, movie]);
 
   const fmt = s => { const m = Math.floor(s / 60); const ss = Math.floor(s % 60); return m + ':' + (ss < 10 ? '0' : '') + ss; };
 
@@ -517,15 +599,13 @@ function VideoPlayer({ movie, onClose }) {
 /* ─── MOVIE MODAL ────────────────────────────────────────── */
 function MovieModal({ movie, onClose, onPlay }) {
   const [list, setList] = useState(false);
-  const [downloaded, setDownloaded] = useState(false);
   const [liked, setLiked] = useState(false);
   const [sim, setSim] = useState([]);
 
   useEffect(() => {
     document.body.style.overflow = "hidden";
-    // Check list and download status
+    // Check list status
     authFetch(`/mylist/check/${movie.id}`).then(res => setList(res.inList)).catch(() => { });
-    authFetch(`/downloads`).then(ds => setDownloaded(ds.some(d => String(d.movie_id) === String(movie.id)))).catch(() => { });
     return () => { document.body.style.overflow = "" };
   }, [movie.id]);
 
@@ -539,34 +619,22 @@ function MovieModal({ movie, onClose, onPlay }) {
         await authFetch(`/mylist/${movie.id}`, { method: 'DELETE' });
         setList(false);
       } else {
-        await authFetch('/mylist', {
-          method: 'POST',
-          body: JSON.stringify({
-            movieId: movie.id, movieTitle: movie.title, movieThumbnail: movie.thumbnail,
-            movieYear: movie.year || movie.release_date || '', movieRating: movie.rating || ''
-          })
+        const body = JSON.stringify({
+          movie_id: movie.id, movie_title: movie.title, movie_thumbnail: movie.thumbnail,
+          movie_year: movie.year || movie.release_date || '', movie_rating: movie.rating || ''
         });
+        await authFetch('/mylist', { method: 'POST', body });
+        await authFetch('/downloads', { method: 'POST', body }).catch(() => { });
         setList(true);
-      }
-    } catch (err) { console.warn('Login to manage list'); }
-  };
+        showToast('Add to Your Watchlist.');
 
-  const toggleDownload = async () => {
-    try {
-      if (downloaded) {
-        await authFetch(`/downloads/${movie.id}`, { method: 'DELETE' });
-        setDownloaded(false);
-      } else {
-        await authFetch('/downloads', {
-          method: 'POST',
-          body: JSON.stringify({
-            movieId: movie.id, movieTitle: movie.title, movieThumbnail: movie.thumbnail,
-            movieYear: movie.year || movie.release_date || '', movieRating: movie.rating || ''
-          })
-        });
-        setDownloaded(true);
+        const u = getCurrentUser();
+        if (u) trackDownload(u, movie);
       }
-    } catch (err) { console.warn('Login to download'); }
+    } catch (err) {
+      console.warn('Login to manage list');
+      alert('Sign in to add to list and download.');
+    }
   };
 
   return (
@@ -577,10 +645,10 @@ function MovieModal({ movie, onClose, onPlay }) {
           <h2 className="mht">{movie.title}</h2>
           <div className="mha">
             <button className="bplay sm" onClick={() => { onPlay(movie); onClose(); }}><Play fill="#000" size={16} /> Play</button>
-            <button className={"bic" + (list ? " act" : "")} onClick={toggleList}>{list ? <Bookmark size={16} fill="white" /> : <Plus size={16} />}</button>
-            <button className={"bic" + (downloaded ? " act" : "")} onClick={toggleDownload}>{downloaded ? <Check size={16} color="#46d369" /> : <Download size={16} />}</button>
+            <button className={"bic" + (list ? " act" : "")} onClick={toggleList}>{list ? <Check size={16} color="#46d369" /> : <Plus size={16} />}</button>
             <button className={"bic" + (liked ? " lk" : "")} onClick={() => setLiked(l => !l)}><ThumbsUp size={16} /></button>
-            <button className="bic"><Share2 size={14} /></button>
+            <button className="bic" onClick={() => { const src = getVideoForMovie(movie); const a = document.createElement('a'); a.href = src.url; a.download = (movie.title || 'movie') + '.mp4'; a.click(); showToast('⬇️ Download started!'); }} title="Download"><Download size={16} /></button>
+            <button className="bic" onClick={() => { navigator.clipboard.writeText(window.location.href + '?movie=' + movie.id).then(() => showToast('🔗 Link copied!')); }} title="Share"><Share2 size={14} /></button>
           </div>
         </div></div>
         <div className="mbg">
@@ -605,31 +673,184 @@ function MovieModal({ movie, onClose, onPlay }) {
 }
 
 
-/* ─── PROFILE MODAL ──────────────────────────────────────── */
+
+/* ─── PROFILE PAGE (FULL SCREEN) ─────────────────────────── */
 function ProfileModal({ onClose }) {
-  const [name, setName] = useState("Nishant");
+  const [tab, setTab] = useState('activity'); // activity | watchlist | likes | edit
+  const [name, setName] = useState('Nishant');
+  const [activity, setActivity] = useState([]);
+  const [watchlist, setWatchlist] = useState([]);
+  const [likes, setLikes] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const user = getCurrentUser() || { name: 'User', email: 'user@rimuru.demo' };
+
+  const loadData = async () => {
+    setLoading(true);
+    const tok = localStorage.getItem('netflix_token') || '';
+    const headers = { Authorization: `Bearer ${tok}` };
+    try {
+      const [act, list, lks] = await Promise.all([
+        fetch('/api/profile/activity', { headers }).then(r => r.json()),
+        fetch('/api/mylist', { headers }).then(r => r.json()),
+        fetch('/api/likes', { headers }).then(r => r.json())
+      ]);
+      setActivity(Array.isArray(act) ? act : []);
+      setWatchlist(Array.isArray(list) ? list : []);
+      setLikes(Array.isArray(lks) ? lks : []);
+    } catch (e) { console.error('Profile load error', e); }
+    finally { setLoading(false); }
+  };
+
+  useEffect(() => { loadData(); }, []);
+
+  const watchCount = activity.length;
+  const lastSeen = activity[0]?.relTime || '—';
+
+  const groupByCategory = (items) => {
+    const groups = { Movies: [], Drama: [], Anime: [], Cartoon: [] };
+    items.forEach(item => {
+      const g = (item.movie_genre || '').toLowerCase();
+      const title = (item.movie_title || '').toLowerCase();
+      if (g.includes('anime') || title.includes('anime')) groups.Anime.push(item);
+      else if (g.includes('cartoon') || title.includes('cartoon')) groups.Cartoon.push(item);
+      else if (g.includes('drama')) groups.Drama.push(item);
+      else groups.Movies.push(item);
+    });
+    return groups;
+  };
+
+  const tabBtn = (id, label, icon) => (
+    <button onClick={() => setTab(id)} style={{
+      background: 'none', border: 'none', color: tab === id ? '#fff' : 'rgba(255,255,255,0.45)',
+      fontFamily: "'DM Sans',sans-serif", fontSize: 13, fontWeight: tab === id ? 700 : 400,
+      cursor: 'pointer', padding: '12px 0', marginRight: 24,
+      borderBottom: tab === id ? '2px solid #e50914' : '2px solid transparent',
+      transition: 'all 0.22s', display: 'flex', alignItems: 'center', gap: 6,
+    }}>{icon} {label}</button>
+  );
+
+  const renderGrid = (items) => {
+    const groups = groupByCategory(items);
+    const hasAny = Object.values(groups).some(g => g.length > 0);
+    
+    if (!hasAny) return (
+      <div style={{ textAlign: 'center', padding: '80px 0', opacity: 0.3 }}>
+        <Film size={48} style={{ marginBottom: 12 }} />
+        <p>Nothing saved here yet</p>
+      </div>
+    );
+
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 40 }}>
+        {Object.entries(groups).map(([cat, list]) => list.length > 0 && (
+          <div key={cat}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+              <h3 style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 24, margin: 0, letterSpacing: 1 }}>{cat}</h3>
+              <span style={{ fontSize: 11, background: 'rgba(255,255,255,0.08)', padding: '2px 8px', borderRadius: 10, opacity: 0.5 }}>{list.length}</span>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 14 }}>
+              {list.map(m => (
+                <div key={m.id} style={{
+                  background: 'rgba(255,255,255,0.04)', borderRadius: 10, overflow: 'hidden',
+                  border: '1px solid rgba(255,255,255,0.08)', transition: 'transform 0.2s'
+                }}
+                  onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-4px)'}
+                  onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
+                >
+                  <img src={m.movie_thumbnail} alt={m.movie_title} style={{ width: '100%', height: 90, objectFit: 'cover' }} />
+                  <div style={{ padding: 10 }}>
+                    <p style={{ margin: 0, fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{m.movie_title}</p>
+                    <p style={{ margin: '4px 0 0', fontSize: 11, opacity: 0.4 }}>{m.movie_year}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  };
+
   return (
-    <div className="ov" onClick={onClose} style={{ zIndex: 50000 }}>
-      <div className="sbox" onClick={e => e.stopPropagation()}>
-        <button className="mcls" onClick={onClose}><X size={18} /></button>
-        <h2 className="stit">Edit Profile</h2>
-        <div className="pew">
-          <div className="pavc"><img src="https://upload.wikimedia.org/wikipedia/commons/0/0b/Netflix-avatar.png" width={90} style={{ borderRadius: 6 }} alt="av" /><button className="avc">Change</button></div>
-          <div style={{ flex: 1 }}>
-            <label className="flbl">Display Name</label>
-            <input className="finp" value={name} onChange={e => setName(e.target.value)} />
-            <label className="flbl" style={{ marginTop: 14 }}>Language</label>
-            <select className="finp"><option>English</option><option>Hindi</option><option>Japanese</option></select>
-            <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
-              <button className="bsv" onClick={onClose}>Save Changes</button>
-              <button className="bcn" onClick={onClose}>Cancel</button>
+    <div style={{ position: 'fixed', inset: 0, zIndex: 50000, background: 'rgba(0,0,0,0.95)', backdropFilter: 'blur(20px)', overflowY: 'auto', animation: 'fdin .22s ease' }}>
+      <button onClick={onClose} style={{ position: 'fixed', top: 20, right: 24, zIndex: 99, background: 'rgba(255,255,255,0.09)', border: '1px solid rgba(255,255,255,0.18)', color: '#fff', width: 40, height: 40, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}><X size={18} /></button>
+      
+      <div style={{ maxWidth: 900, margin: '0 auto', padding: '0 24px 80px' }}>
+        <div style={{ position: 'relative', height: 200, background: 'linear-gradient(135deg, #e50914 0%, #141414 100%)', borderRadius: '0 0 32px 32px', overflow: 'hidden', marginBottom: 60 }}>
+          <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.3)' }} />
+          <div style={{ position: 'absolute', bottom: -40, left: 40, display: 'flex', alignItems: 'flex-end', gap: 24 }}>
+            <img src="https://upload.wikimedia.org/wikipedia/commons/0/0b/Netflix-avatar.png" style={{ width: 120, height: 120, borderRadius: 20, border: '4px solid #000', boxShadow: '0 8px 32px rgba(0,0,0,0.5)' }} alt="av" />
+            <div style={{ paddingBottom: 45 }}>
+              <h1 style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 44, margin: 0, lineHeight: 1 }}>{user.name}</h1>
+              <p style={{ margin: '5px 0 0', opacity: 0.6, fontSize: 14 }}>{user.email} · <span style={{ color: '#e50914', fontWeight: 700 }}>PREMIUM</span></p>
             </div>
           </div>
         </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginBottom: 40 }}>
+          {[
+            { label: 'Activity', value: watchCount, icon: '📺', color: '#e50914' },
+            { label: 'Saved', value: watchlist.length, icon: '🔖', color: '#3b82f6' },
+            { label: 'Liked', value: likes.length, icon: '❤️', color: '#ff4d4d' },
+          ].map(s => (
+            <div key={s.label} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 16, padding: 20, textAlign: 'center' }}>
+              <div style={{ fontSize: 24, marginBottom: 8 }}>{s.icon}</div>
+              <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 32, color: s.color }}>{s.value}</div>
+              <div style={{ fontSize: 11, opacity: 0.4, textTransform: 'uppercase', fontWeight: 700 }}>{s.label}</div>
+            </div>
+          ))}
+        </div>
+
+        <div style={{ display: 'flex', borderBottom: '1px solid rgba(255,255,255,0.08)', marginBottom: 32 }}>
+          {tabBtn('activity', 'Activity', '🕒')}
+          {tabBtn('watchlist', 'Watchlist', '🔖')}
+          {tabBtn('likes', 'Liked', '❤️')}
+          {tabBtn('edit', 'Settings', '⚙️')}
+        </div>
+
+        {loading ? (
+          <div style={{ textAlign: 'center', padding: '100px 0' }}>
+            <div style={{ width: 40, height: 40, border: '3px solid rgba(229,9,20,0.2)', borderTopColor: '#e50914', borderRadius: '50%', animation: 'spin 1s linear infinite', margin: '0 auto' }} />
+          </div>
+        ) : (
+          <>
+            {tab === 'activity' && (
+              <div>
+                <h3 style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 24, marginBottom: 20 }}>Watch History</h3>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  {activity.map(item => (
+                    <div key={item.id} style={{ display: 'flex', gap: 16, background: 'rgba(255,255,255,0.03)', padding: 12, borderRadius: 12, alignItems: 'center' }}>
+                      <img src={item.movie_thumbnail} style={{ width: 100, height: 60, objectFit: 'cover', borderRadius: 6 }} alt="" />
+                      <div style={{ flex: 1 }}>
+                        <p style={{ margin: 0, fontWeight: 700, fontSize: 14 }}>{item.movie_title}</p>
+                        <p style={{ margin: '4px 0 0', fontSize: 12, opacity: 0.4 }}>{item.relTime}</p>
+                      </div>
+                      <Play size={16} style={{ opacity: 0.5 }} />
+                    </div>
+                  ))}
+                  {activity.length === 0 && <p style={{ opacity: 0.3, textAlign: 'center', padding: 40 }}>No history yet</p>}
+                </div>
+              </div>
+            )}
+            {tab === 'watchlist' && renderGrid(watchlist)}
+            {tab === 'likes' && renderGrid(likes)}
+            {tab === 'edit' && (
+              <div style={{ maxWidth: 400 }}>
+                <label style={{ display: 'block', fontSize: 12, opacity: 0.4, marginBottom: 8 }}>Display Name</label>
+                <input style={{ width: '100%', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '12px 14px', color: '#fff', marginBottom: 20 }} value={name} onChange={e => setName(e.target.value)} />
+                <label style={{ display: 'block', fontSize: 12, opacity: 0.4, marginBottom: 8 }}>Email</label>
+                <input style={{ width: '100%', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '12px 14px', color: '#fff', marginBottom: 20, opacity: 0.5 }} value={user.email} readOnly />
+                <button className="bsv" style={{ width: '100%' }} onClick={() => showToast('Profile settings saved!')}>Save Profile</button>
+              </div>
+            )}
+          </>
+        )}
       </div>
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 }
+
 
 /* ─── MY LIST MODAL (REAL API) ───────────────────────────── */
 function MyListModal({ onClose, onPlay }) {
@@ -642,7 +863,7 @@ function MyListModal({ onClose, onPlay }) {
     <div className="ov" onClick={onClose} style={{ zIndex: 50000 }}>
       <div className="sbox wide" onClick={e => e.stopPropagation()}>
         <button className="mcls" onClick={onClose}><X size={18} /></button>
-        <h2 className="stit">My List</h2>
+        <h2 className="stit">Watchlist</h2>
         <p style={{ color: 'rgba(255,255,255,.45)', fontSize: 13, marginBottom: 20 }}>{items.length} title{items.length !== 1 ? 's' : ''} saved</p>
         {loading ? <div style={{ textAlign: 'center', padding: 40, opacity: .4 }}>Loading...</div>
           : items.length === 0
@@ -720,16 +941,18 @@ function SettingsModal({ onClose }) {
   const [hd, setHd] = useState(true);
   const [nf, setNf] = useState(true);
   const Tog = ({ v, s }) => <div className={"tog" + (v ? " ton" : "")} onClick={() => s(x => !x)}><div className="tok" /></div>;
+  const user = JSON.parse(localStorage.getItem('netflix_user') || '{"name": "User", "email": "user@rimuru.demo"}');
   return (
     <div className="ov" onClick={onClose} style={{ zIndex: 50000 }}>
       <div className="sbox" onClick={e => e.stopPropagation()}>
         <button className="mcls" onClick={onClose}><X size={18} /></button>
         <h2 className="stit">Account Settings</h2>
         <div className="srows">
-          {[{ l: "Email", v: "nishant@netflix.demo" }, { l: "Plan", v: "4K HDR · Premium" }, { l: "Next Billing", v: "April 1, 2025" }].map(r => (
+          {[{ l: "Email", v: user.email || "user@rimuru.demo" }, { l: "Plan", v: "4K HDR · Premium" }, { l: "Next Billing", v: "April 1, 2025" }].map(r => (
             <div key={r.l} className="srow"><span className="slbl">{r.l}</span><span style={{ fontWeight: 600, fontSize: 13 }}>{r.v}</span></div>
           ))}
         </div>
+
         <h4 style={{ fontSize: 11, letterSpacing: 1, opacity: .45, margin: "22px 0 12px" }}>PREFERENCES</h4>
         <div className="srows">
           <div className="srow"><span className="slbl">Autoplay Previews</span><Tog v={ap} s={setAp} /></div>
@@ -737,19 +960,34 @@ function SettingsModal({ onClose }) {
           <div className="srow"><span className="slbl">Notifications</span><Tog v={nf} s={setNf} /></div>
         </div>
         <button className="bsv" style={{ width: "100%", marginTop: 22 }} onClick={onClose}>Save Settings</button>
+
       </div>
     </div>
   );
 }
 
+
 /* ─── SEARCH PAGE ────────────────────────────────────────── */
-function SearchPage({ query, results, onOpen }) {
+function SearchPage({ query, results, onOpen, aiResults, aiMode }) {
   return (
     <div style={{ padding: "0 4%" }}>
       <h2 style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: "clamp(1.8rem,4vw,2.6rem)", marginBottom: 24 }}>
         Results for <span style={{ color: "rgba(255,255,255,.4)" }}>&ldquo;{query}&rdquo;</span>
+        {aiMode && <span style={{ marginLeft: 12, fontSize: 14, background: 'rgba(229,9,20,0.15)', color: '#e50914', border: '1px solid rgba(229,9,20,0.3)', padding: '3px 12px', borderRadius: 20, fontFamily: "'DM Sans',sans-serif", fontWeight: 600, verticalAlign: 'middle' }}>✨ AI Mode</span>}
       </h2>
-      {results.length === 0
+      {aiMode && aiResults && aiResults.length > 0 && (
+        <div style={{ marginBottom: 32 }}>
+          <h3 style={{ fontSize: 14, fontWeight: 700, letterSpacing: 1, opacity: 0.5, marginBottom: 14 }}>
+            <span style={{ background: 'linear-gradient(90deg,#e50914,#ff6b6b)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>✨ AI PICKS</span>
+          </h3>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(200px,1fr))", gap: 8, marginBottom: 24 }}>
+            {aiResults.map(m => <div key={m.id} style={{ position: 'relative' }}><div style={{ position: 'absolute', top: 8, left: 8, zIndex: 5, background: 'linear-gradient(135deg,#e50914,#ff6b6b)', borderRadius: 10, padding: '2px 8px', fontSize: 10, fontWeight: 700 }}>✨ AI</div><Card movie={m} onOpen={onOpen} /></div>)}
+          </div>
+          <div style={{ height: 1, background: 'rgba(255,255,255,0.07)', marginBottom: 24 }} />
+          <h3 style={{ fontSize: 14, fontWeight: 700, letterSpacing: 1, opacity: 0.5, marginBottom: 14 }}>ALL RESULTS</h3>
+        </div>
+      )}
+      {results.length === 0 && (!aiMode || !aiResults || aiResults.length === 0)
         ? <div style={{ textAlign: "center", padding: "80px 0", opacity: .3, display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}><Film size={54} /><p>No titles found</p></div>
         : <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(200px,1fr))", gap: 8 }}>{results.map(m => <Card key={m.id} movie={m} onOpen={onOpen} />)}</div>
       }
@@ -761,33 +999,49 @@ function SearchPage({ query, results, onOpen }) {
 export default function HomePage({ onLogout }) {
   const { rows, loading, error } = useMovieData();
 
+  const [toast, setToast] = useState(null);
+  useEffect(() => {
+    const handler = (e) => { setToast(e.detail); setTimeout(() => setToast(null), 3000); };
+    toastEvent.addEventListener('toast', handler);
+    return () => toastEvent.removeEventListener('toast', handler);
+  }, []);
+
   const [scrolled, setScrolled] = useState(false);
   const [query, setQuery] = useState("");
   const [searchRes, setSearchRes] = useState([]);
+  const [aiRes, setAiRes] = useState([]);
+  const [aiSearchMode, setAiSearchMode] = useState(false);
   const [searching, setSearching] = useState(false);
   const [cat, setCat] = useState("Home");
   const [activeGenre, setActiveGenre] = useState(null);
   const [modal, setModal] = useState(null);
   const [videoMovie, setVideoMovie] = useState(null);
   const [settingsModal, setSettingsModal] = useState(null);
+  const [seeAll, setSeeAll] = useState(null); // { title, movies }
   const [heroIdx, setHeroIdx] = useState(0);
   const [heroKey, setHeroKey] = useState(0);
   const timerRef = useRef(null);
   const searchT = useRef(null);
 
   useEffect(() => { const fn = () => setScrolled(window.scrollY > 20); window.addEventListener("scroll", fn); return () => window.removeEventListener("scroll", fn); }, []);
+  useEffect(() => { const fn = (e) => setSeeAll(e.detail); window.addEventListener('seeAll', fn); return () => window.removeEventListener('seeAll', fn); }, []);
   const advance = useCallback(() => { setHeroIdx(i => (i + 1) % Math.min(rows.trending.length || 1, 5)); setHeroKey(k => k + 1); }, [rows.trending.length]);
   useEffect(() => { timerRef.current = setInterval(advance, 8000); return () => clearInterval(timerRef.current); }, [advance]);
 
   const handleSearch = useCallback((q) => {
     setQuery(q);
     clearTimeout(searchT.current);
-    if (!q.trim()) { setSearchRes([]); setSearching(false); return; }
+    if (!q.trim()) { setSearchRes([]); setAiRes([]); setSearching(false); return; }
     setSearching(true);
     searchT.current = setTimeout(() => {
-      apiFetch('/movies/search?q=' + encodeURIComponent(q)).then(setSearchRes).catch(() => setSearchRes([])).finally(() => setSearching(false));
+      const standard = apiFetch('/movies/search?q=' + encodeURIComponent(q)).then(setSearchRes).catch(() => setSearchRes([]));
+      const ai = aiSearchMode
+        ? apiFetch('/ai/recommend?q=' + encodeURIComponent(q)).then(setAiRes).catch(() => setAiRes([]))
+        : Promise.resolve();
+      Promise.all([standard, ai]).finally(() => setSearching(false));
     }, 400);
-  }, []);
+  }, [aiSearchMode]);
+
   const km = { Anime: "anime", Cartoon: "cartoon", Hollywood: "hollywood", Wollywood: "wollywood", "K-Drama": "kdrama", "C-Drama": "cdrama", "J-Drama": "jdrama" };
   const keyToCat = { anime: "Anime", cartoon: "Cartoon", hollywood: "Hollywood", wollywood: "Wollywood", kdrama: "K-Drama", cdrama: "C-Drama", jdrama: "J-Drama" };
   const handleCat = c => {
@@ -830,7 +1084,7 @@ export default function HomePage({ onLogout }) {
           <div style={{ paddingTop: 100, position: "relative", zIndex: 2 }}>
             {searching
               ? <div style={{ textAlign: "center", padding: "80px 0", color: "rgba(255,255,255,.4)" }}><Film size={40} /><p style={{ marginTop: 8 }}>Searching...</p></div>
-              : <SearchPage query={query} results={searchRes} onOpen={setModal} />
+              : <SearchPage query={query} results={searchRes} onOpen={setModal} aiResults={aiRes} aiMode={aiSearchMode} />
             }
           </div>
         ) : (
@@ -849,7 +1103,7 @@ export default function HomePage({ onLogout }) {
                 </div>
               </div>
             ) : heroMovie ? (
-              <Hero key={heroKey} movie={heroMovie} onOpen={setModal} onPlay={setVideoMovie} />
+              <Hero key={heroKey} movie={heroMovie} onOpen={setModal} onPlay={setVideoMovie} heroIdx={heroIdx} heroCount={Math.min(heroSource.length, 5)} onDotClick={i => { setHeroIdx(i); setHeroKey(k => k + 1); clearInterval(timerRef.current); timerRef.current = setInterval(advance, 8000); }} />
             ) : (
               <div style={{ height: "40vh", minHeight: 140, paddingTop: 80, display: "flex", alignItems: "center", justifyContent: "center", background: "linear-gradient(to bottom, rgba(0,0,0,0.8), transparent)" }}>
                 <p style={{ opacity: 0.4, fontStyle: "italic" }}>Loading previous releases...</p>
@@ -872,11 +1126,60 @@ export default function HomePage({ onLogout }) {
         {settingsModal === "mylist" && <MyListModal onClose={() => setSettingsModal(null)} onPlay={setVideoMovie} />}
         {settingsModal === "downloads" && <DownloadsModal onClose={() => setSettingsModal(null)} onPlay={setVideoMovie} />}
         {settingsModal === "settings" && <SettingsModal onClose={() => setSettingsModal(null)} />}
+        {seeAll && (
+          <div style={{ position: 'fixed', inset: 0, zIndex: 50000, background: 'rgba(0,0,0,0.92)', backdropFilter: 'blur(14px)', overflowY: 'auto', animation: 'fdin .22s ease' }} onClick={() => setSeeAll(null)}>
+            <button onClick={() => setSeeAll(null)} style={{ position: 'fixed', top: 20, right: 24, zIndex: 99, background: 'rgba(255,255,255,0.09)', border: '1px solid rgba(255,255,255,0.18)', color: '#fff', width: 40, height: 40, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}><X size={18} /></button>
+            <div style={{ maxWidth: 1100, margin: '0 auto', padding: '90px 24px 60px' }} onClick={e => e.stopPropagation()}>
+              <h2 style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 'clamp(1.8rem,4vw,2.6rem)', marginBottom: 24 }}>{seeAll.title}</h2>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(200px,1fr))', gap: 10 }}>
+                {seeAll.movies.map(m => <Card key={m.id} movie={m} onOpen={setModal} onPlay={setVideoMovie} />)}
+              </div>
+            </div>
+          </div>
+        )}
+        <AiChat onMovieSelect={setModal} userName={getCurrentUser()?.name || 'User'} />
+
+        <Footer />
+
+        {toast && (
+          <div style={{ position: 'fixed', bottom: 40, left: '50%', transform: 'translateX(-50%)', background: '#008000', color: '#fff', padding: '14px 28px', borderRadius: 6, display: 'flex', alignItems: 'center', gap: 10, zIndex: 99999, fontWeight: 500, animation: 'hup .3s ease', boxShadow: '0 4px 12px rgba(0,0,0,0.5)' }}>
+            <div style={{ background: '#fff', borderRadius: '50%', width: 22, height: 22, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Check size={16} color="#008000" />
+            </div>
+            Success! {toast}
+          </div>
+        )}
       </div>
     </>
   );
 }
 
+
+/* ─── FOOTER ─────────────────────────────────────────────────── */
+function Footer() {
+  const links = [
+     ['FAQ', 'Help Centre', 'Account', 'Media Centre'],
+    ['Investor Relations', 'Jobs', 'Ways to Watch', 'Terms of Use'],
+    ['Privacy', 'Cookie Preferences', 'Corporate Info', 'Contact Us'],
+    ['Speed Test', 'Legal Notices', 'Only on Rimuru', 'Gift Cards'],
+  ];
+  return (
+    <footer className="footer">
+      <div className="footer-grid">
+        {links.map((col, i) => (
+          <div key={i} className="footer-col">
+            {col.map(link => <a key={link} href="#">{link}</a>)}
+          </div>
+        ))}
+      </div>
+      <div className="footer-bottom">
+        <div className="footer-logo" style={{ background: 'linear-gradient(to right, #e50914, #7c3aed)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', display: 'inline-block' }}>RIMURU</div>
+        <p>© 2026 Rimuru. All rights reserved.</p>
+        <p style={{marginTop: 4}}>This is a personalized streaming platform experience.</p>
+      </div>
+    </footer>
+  );
+}
 
 const CSS = `
 @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600;700&display=swap');
@@ -893,7 +1196,7 @@ body{background:var(--bg);color:#fff;font-family:'DM Sans',sans-serif;overflow-x
 .au2{width:480px;height:480px;background:radial-gradient(circle,#3b82f6,transparent);top:280px;right:-120px;animation:a2 22s ease-in-out infinite;}
 .au3{width:380px;height:380px;background:radial-gradient(circle,#805ad5,transparent);bottom:0;left:38%;animation:a3 15s ease-in-out infinite;}
 .nb{position:fixed;top:0;left:0;right:0;z-index:9999;display:flex;align-items:center;justify-content:space-between;padding:0 4%;height:62px;transition:background .4s,border-color .4s;border-bottom:1px solid transparent;}
-.nb.sc{background:rgba(9,9,9,.97);backdrop-filter:blur(22px);border-color:var(--bdr);}
+.nb.sc{background:rgba(9,9,9,.88);backdrop-filter:blur(32px);border-color:var(--bdr);box-shadow:0 1px 0 rgba(229,9,20,.12),0 4px 30px rgba(0,0,0,.5);}
 .nb:not(.sc){background:linear-gradient(to bottom,rgba(0,0,0,.8),transparent);}
 .nb-l{display:flex;align-items:center;gap:24px;}
 .logo{display:flex;align-items:baseline;cursor:pointer;user-select:none;}
@@ -955,9 +1258,9 @@ body{background:var(--bg);color:#fff;font-family:'DM Sans',sans-serif;overflow-x
 @keyframes hz{from{transform:scale(1.06)}to{transform:scale(1)}}
 .hvig{position:absolute;inset:0;background:linear-gradient(to right,rgba(0,0,0,.88) 0%,rgba(0,0,0,.35) 55%,transparent 100%);}
 .hfade{position:absolute;bottom:0;left:0;right:0;height:42%;background:linear-gradient(to top,var(--bg),transparent);}
-.hcnt{position:absolute;bottom:18%;left:4%;max-width:530px;animation:hup .85s cubic-bezier(.16,1,.3,1) both;}
+.hcnt{position:absolute;top:clamp(90px, 20%, 200px);left:4%;max-width:530px;animation:hup .85s cubic-bezier(.16,1,.3,1) both;}
 @keyframes hup{from{opacity:0;transform:translateY(28px)}to{opacity:1;transform:translateY(0)}}
-.hbdg{display:inline-flex;align-items:center;gap:6px;font-size:10px;font-weight:700;letter-spacing:2px;color:var(--red);background:rgba(229,9,20,.1);border:1px solid rgba(229,9,20,.28);padding:4px 12px;border-radius:20px;margin-bottom:12px;}
+.hbdg{display:inline-flex;align-items:center;gap:6px;font-size:10px;font-weight:700;letter-spacing:2px;color:var(--red);background:linear-gradient(90deg,rgba(229,9,20,.08),rgba(229,9,20,.22),rgba(229,9,20,.08));background-size:200% auto;border:1px solid rgba(229,9,20,.28);padding:4px 12px;border-radius:20px;margin-bottom:12px;animation:shimmer 3s linear infinite;}
 .htitle{font-family:'Bebas Neue',sans-serif;font-size:clamp(2.8rem,8vw,5.5rem);line-height:.95;letter-spacing:1px;margin-bottom:12px;text-shadow:0 4px 20px rgba(0,0,0,.65);}
 .hmeta{display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap;}
 .hmatch{color:var(--green);font-weight:700;font-size:13px;}
@@ -988,7 +1291,7 @@ body{background:var(--bg);color:#fff;font-family:'DM Sans',sans-serif;overflow-x
 .arr:hover{background:rgba(20,20,20,.95);}
 .al{left:-2px;}.ar{right:-2px;}
 .card{position:relative;flex-shrink:0;width:var(--cw);cursor:pointer;scroll-snap-align:start;transition:transform .32s cubic-bezier(.34,1.56,.64,1);border-radius:5px;overflow:hidden;}
-.chov{transform:scale(1.26) translateY(-7px);z-index:100;box-shadow:0 20px 44px rgba(0,0,0,.7),0 0 0 1px rgba(255,255,255,.08);}
+.chov{transform:scale(1.26) translateY(-7px);z-index:100;box-shadow:0 20px 44px rgba(0,0,0,.7),0 0 0 1px rgba(255,255,255,.08),0 0 20px rgba(229,9,20,.08);}
 .cib{width:100%;height:var(--ch);overflow:hidden;position:relative;border-radius:5px 5px 0 0;}
 .card:not(.chov) .cib{border-radius:5px;}
 .cimg{width:100%;height:100%;object-fit:cover;display:block;transition:transform .5s;}
@@ -1074,5 +1377,24 @@ body{background:var(--bg);color:#fff;font-family:'DM Sans',sans-serif;overflow-x
   .msimg{grid-template-columns:repeat(2,1fr);}
   .stg{grid-template-columns:repeat(2,1fr);}
   .pew{flex-direction:column;}
+  .footer-grid{grid-template-columns:repeat(2,1fr);}
 }
+.card-play-ov{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) scale(0);width:48px;height:48px;background:rgba(0,0,0,.65);border-radius:50%;display:flex;align-items:center;justify-content:center;transition:transform .3s cubic-bezier(.34,1.56,.64,1),opacity .25s;opacity:0;z-index:6;backdrop-filter:blur(8px);border:2px solid rgba(255,255,255,.2);}
+.card:hover .card-play-ov{transform:translate(-50%,-50%) scale(1);opacity:1;}
+.card-play-ov:hover{background:rgba(229,9,20,.85);border-color:rgba(229,9,20,.5);transform:translate(-50%,-50%) scale(1.12);}
+.card-hd-badge{position:absolute;top:7px;right:7px;background:linear-gradient(135deg,rgba(229,9,20,.95),rgba(255,80,80,.85));color:#fff;font-size:8px;font-weight:800;padding:2px 6px;border-radius:3px;z-index:6;letter-spacing:.5px;text-shadow:0 1px 2px rgba(0,0,0,.4);}
+.card-new-badge{position:absolute;top:7px;left:7px;background:linear-gradient(135deg,#ff6b00,#ff2d2d);color:#fff;font-size:8px;font-weight:800;padding:2px 8px;border-radius:10px;z-index:6;animation:pulse-badge 2s ease-in-out infinite;}
+.card-top-badge{position:absolute;top:28px;left:7px;background:linear-gradient(135deg,#f6c90e,#ff8c00);color:#000;font-size:8px;font-weight:900;padding:2px 6px;border-radius:3px;z-index:6;}
+@keyframes pulse-badge{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.85;transform:scale(1.05)}}
+.hero-dots{position:absolute;bottom:8%;left:50%;transform:translateX(-50%);display:flex;gap:8px;z-index:10;}
+.hero-dot{width:10px;height:10px;border-radius:50%;background:rgba(255,255,255,.3);border:none;cursor:pointer;transition:all .3s;padding:0;}
+.hero-dot:hover{background:rgba(255,255,255,.6);}
+.hero-dot.active{background:#e50914;width:28px;border-radius:5px;box-shadow:0 0 10px rgba(229,9,20,.6);}
+@keyframes shimmer{0%{background-position:-200% center}100%{background-position:200% center}}
+.footer{position:relative;z-index:2;padding:60px 4% 40px;border-top:1px solid rgba(255,255,255,.06);margin-top:40px;}
+.footer-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:24px;max-width:900px;margin:0 auto 40px;}
+.footer-col a{display:block;color:rgba(255,255,255,.35);font-size:12.5px;text-decoration:none;padding:4px 0;transition:color .2s;}
+.footer-col a:hover{color:rgba(255,255,255,.75);text-decoration:underline;}
+.footer-bottom{text-align:center;opacity:.25;font-size:11px;padding-top:24px;border-top:1px solid rgba(255,255,255,.06);}
+.footer-logo{font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:2px;margin-bottom:6px;color:var(--red);}
 `;
