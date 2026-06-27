@@ -1,0 +1,417 @@
+{
+  "myList": [
+    {
+      "user_id": "offline_user_1782464168331",
+      "movie_id": "1108427",
+      "movie_title": "Moana",
+      "movie_thumbnail": "https://image.tmdb.org/t/p/w500/c6BPbkO5Npt1OdwttAxCFo06wtH.jpg",
+      "movie_year": "2026",
+      "movie_rating": "N/A",
+      "movie_genre": "",
+      "added_at": "2026-06-27T09:46:01.078Z"
+    },
+    {
+      "user_id": "offline_user_1782464168331",
+      "movie_id": "259837",
+      "movie_title": "The WONDERfools",
+      "movie_thumbnail": "https://image.tmdb.org/t/p/w500/810mXC0xkxXVtoKIPGGVgO9PuLh.jpg",
+      "movie_year": "2026",
+      "movie_rating": "9.1",
+      "movie_genre": "",
+      "added_at": "2026-06-27T09:54:31.663Z"
+    }
+  ],
+  "downloads": [
+    {
+      "user_id": "offline_user_1782464168331",
+      "movie_id": "1108427",
+      "movie_title": "Moana",
+      "movie_thumbnail": "https://image.tmdb.org/t/p/w500/c6BPbkO5Npt1OdwttAxCFo06wtH.jpg",
+      "movie_year": "2026",
+      "movie_rating": "N/A",
+      "downloaded_at": "2026-06-27T09:46:01.585Z"
+    },
+    {
+      "user_id": "offline_user_1782464168331",
+      "movie_id": "259837",
+      "movie_title": "The WONDERfools",
+      "movie_thumbnail": "https://image.tmdb.org/t/p/w500/810mXC0xkxXVtoKIPGGVgO9PuLh.jpg",
+      "movie_year": "2026",
+      "movie_rating": "9.1",
+      "downloaded_at": "2026-06-27T09:54:32.165Z"
+    }
+  ],
+  "watchHistory": [
+    {
+      "user_id": "offline_user_1782464168331",
+      "movie_id": "232230",
+      "movie_title": "Lord of Mysteries",
+      "movie_thumbnail": "https://image.tmdb.org/t/p/w500/AdWWrcYKNXlpeWNJlmK4HCJ6Dj9.jpg",
+      "duration_min": 1,
+      "season": null,
+      "episode": null,
+      "createdAt": "2026-06-27T09:47:48.640Z"
+    },
+    {
+      "user_id": "offline_user_1782464168331",
+      "movie_id": "232230",
+      "movie_title": "Lord of Mysteries",
+      "movie_thumbnail": "https://image.tmdb.org/t/p/w500/AdWWrcYKNXlpeWNJlmK4HCJ6Dj9.jpg",
+      "duration_min": 1,
+      "season": null,
+      "episode": null,
+      "createdAt": "2026-06-27T09:47:48.646Z"
+    },
+    {
+      "user_id": "offline_user_1782464168331",
+      "movie_id": "196950",
+      "movie_title": "Witch Hat Atelier",
+      "movie_thumbnail": "https://image.tmdb.org/t/p/w500/7zSko8MBo8UxJi2fPwglXFz7gV.jpg",
+      "duration_min": 1,
+      "season": null,
+      "episode": null,
+      "createdAt": "2026-06-27T11:19:59.032Z"
+    },
+    {
+      "user_id": "offline_user_1782464168331",
+      "movie_id": "196950",
+      "movie_title": "Witch Hat Atelier",
+      "movie_thumbnail": "https://image.tmdb.org/t/p/w500/7zSko8MBo8UxJi2fPwglXFz7gV.jpg",
+      "duration_min": 1,
+      "season": null,
+      "episode": null,
+      "createdAt": "2026-06-27T11:19:59.044Z"
+    },
+    {
+      "user_id": "offline_user_1782464168331",
+      "movie_id": "276161",
+      "movie_title": "Teach You a Lesson",
+      "movie_thumbnail": "https://image.tmdb.org/t/p/w500/vyG93jhmPL7tBIhRtCLa5mdBKob.jpg",
+      "duration_min": 1,
+      "season": null,
+      "episode": null,
+      "createdAt": "2026-06-27T11:21:37.750Z"
+    },
+    {
+      "user_id": "offline_user_1782464168331",
+      "movie_id": "276161",
+      "movie_title": "Teach You a Lesson",
+      "movie_thumbnail": "https://image.tmdb.org/t/p/w500/vyG93jhmPL7tBIhRtCLa5mdBKob.jpg",
+      "duration_min": 1,
+      "season": null,
+      "episode": null,
+      "createdAt": "2026-06-27T11:21:37.761Z"
+    },
+    {
+      "user_id": "offline_user_1782559472883",
+      "movie_id": "1242898",
+      "movie_title": "Predator: Badlands",
+      "movie_thumbnail": "https://image.tmdb.org/t/p/w500/82lM4GJ9uuNvNDOEpxFy77uv4Ak.jpg",
+      "duration_min": 1,
+      "season": null,
+      "episode": null,
+      "createdAt": "2026-06-27T11:24:43.885Z"
+    },
+    {
+      "user_id": "offline_user_1782559472883",
+      "movie_id": "1242898",
+      "movie_title": "Predator: Badlands",
+      "movie_thumbnail": "https://image.tmdb.org/t/p/w500/82lM4GJ9uuNvNDOEpxFy77uv4Ak.jpg",
+      "duration_min": 1,
+      "season": null,
+      "episode": null,
+      "createdAt": "2026-06-27T11:24:43.889Z"
+    },
+    {
+      "user_id": "offline_user_1782464168331",
+      "movie_id": "65733",
+      "movie_title": "Doraemon",
+      "movie_thumbnail": "https://image.tmdb.org/t/p/w500/c2oiRa7V3bQzof4wVGzLXtWJ5QU.jpg",
+      "duration_min": 1,
+      "season": null,
+      "episode": null,
+      "createdAt": "2026-06-27T11:37:39.788Z"
+    },
+    {
+      "user_id": "offline_user_1782464168331",
+      "movie_id": "65733",
+      "movie_title": "Doraemon",
+      "movie_thumbnail": "https://image.tmdb.org/t/p/w500/c2oiRa7V3bQzof4wVGzLXtWJ5QU.jpg",
+      "duration_min": 1,
+      "season": null,
+      "episode": null,
+      "createdAt": "2026-06-27T11:37:39.826Z"
+    },
+    {
+      "user_id": "offline_user_1782464168331",
+      "movie_id": "240411",
+      "movie_title": "Dan Da Dan",
+      "movie_thumbnail": "https://image.tmdb.org/t/p/w500/uNTrRKIOyKYISthoeizghtXPEOK.jpg",
+      "duration_min": 1,
+      "season": null,
+      "episode": null,
+      "createdAt": "2026-06-27T11:38:24.258Z"
+    },
+    {
+      "user_id": "offline_user_1782464168331",
+      "movie_id": "240411",
+      "movie_title": "Dan Da Dan",
+      "movie_thumbnail": "https://image.tmdb.org/t/p/w500/uNTrRKIOyKYISthoeizghtXPEOK.jpg",
+      "duration_min": 1,
+      "season": null,
+      "episode": null,
+      "createdAt": "2026-06-27T11:38:24.279Z"
+    },
+    {
+      "user_id": "offline_user_1782464168331",
+      "movie_id": "65733",
+      "movie_title": "Doraemon",
+      "movie_thumbnail": "https://image.tmdb.org/t/p/w500/c2oiRa7V3bQzof4wVGzLXtWJ5QU.jpg",
+      "duration_min": 1,
+      "season": null,
+      "episode": null,
+      "createdAt": "2026-06-27T12:56:09.009Z"
+    },
+    {
+      "user_id": "offline_user_1782464168331",
+      "movie_id": "65733",
+      "movie_title": "Doraemon",
+      "movie_thumbnail": "https://image.tmdb.org/t/p/w500/c2oiRa7V3bQzof4wVGzLXtWJ5QU.jpg",
+      "duration_min": 1,
+      "season": null,
+      "episode": null,
+      "createdAt": "2026-06-27T12:56:09.016Z"
+    },
+    {
+      "user_id": "offline_user_1782464168331",
+      "movie_id": "65733",
+      "movie_title": "Doraemon",
+      "movie_thumbnail": "https://image.tmdb.org/t/p/w500/c2oiRa7V3bQzof4wVGzLXtWJ5QU.jpg",
+      "duration_min": 1,
+      "season": null,
+      "episode": null,
+      "createdAt": "2026-06-27T12:56:26.191Z"
+    },
+    {
+      "user_id": "offline_user_1782464168331",
+      "movie_id": "65733",
+      "movie_title": "Doraemon",
+      "movie_thumbnail": "https://image.tmdb.org/t/p/w500/c2oiRa7V3bQzof4wVGzLXtWJ5QU.jpg",
+      "duration_min": 1,
+      "season": null,
+      "episode": null,
+      "createdAt": "2026-06-27T12:56:26.196Z"
+    },
+    {
+      "user_id": "offline_user_1782464168331",
+      "movie_id": "259837",
+      "movie_title": "The WONDERfools",
+      "movie_thumbnail": "https://image.tmdb.org/t/p/w500/810mXC0xkxXVtoKIPGGVgO9PuLh.jpg",
+      "duration_min": 1,
+      "season": null,
+      "episode": null,
+      "createdAt": "2026-06-27T12:56:47.627Z"
+    },
+    {
+      "user_id": "offline_user_1782464168331",
+      "movie_id": "259837",
+      "movie_title": "The WONDERfools",
+      "movie_thumbnail": "https://image.tmdb.org/t/p/w500/810mXC0xkxXVtoKIPGGVgO9PuLh.jpg",
+      "duration_min": 1,
+      "season": null,
+      "episode": null,
+      "createdAt": "2026-06-27T12:56:47.678Z"
+    },
+    {
+      "user_id": "offline_user_1782464168331",
+      "movie_id": "259140",
+      "movie_title": "Ranma1/2",
+      "movie_thumbnail": "https://image.tmdb.org/t/p/w500/xvD9urN8lUtWw5fm4a87Rl3dCZn.jpg",
+      "duration_min": 1,
+      "season": null,
+      "episode": null,
+      "createdAt": "2026-06-27T15:03:17.959Z"
+    },
+    {
+      "user_id": "offline_user_1782464168331",
+      "movie_id": "259140",
+      "movie_title": "Ranma1/2",
+      "movie_thumbnail": "https://image.tmdb.org/t/p/w500/xvD9urN8lUtWw5fm4a87Rl3dCZn.jpg",
+      "duration_min": 1,
+      "season": null,
+      "episode": null,
+      "createdAt": "2026-06-27T15:03:17.965Z"
+    },
+    {
+      "user_id": "offline_user_1782464168331",
+      "movie_id": "65733",
+      "movie_title": "Doraemon",
+      "movie_thumbnail": "https://image.tmdb.org/t/p/w500/c2oiRa7V3bQzof4wVGzLXtWJ5QU.jpg",
+      "duration_min": 1,
+      "season": null,
+      "episode": null,
+      "createdAt": "2026-06-27T15:03:47.780Z"
+    },
+    {
+      "user_id": "offline_user_1782464168331",
+      "movie_id": "65733",
+      "movie_title": "Doraemon",
+      "movie_thumbnail": "https://image.tmdb.org/t/p/w500/c2oiRa7V3bQzof4wVGzLXtWJ5QU.jpg",
+      "duration_min": 1,
+      "season": null,
+      "episode": null,
+      "createdAt": "2026-06-27T15:03:47.785Z"
+    },
+    {
+      "user_id": "offline_user_1782464168331",
+      "movie_id": "65733",
+      "movie_title": "Doraemon",
+      "movie_thumbnail": "https://image.tmdb.org/t/p/w500/c2oiRa7V3bQzof4wVGzLXtWJ5QU.jpg",
+      "duration_min": 1,
+      "season": null,
+      "episode": null,
+      "createdAt": "2026-06-27T15:03:58.519Z"
+    },
+    {
+      "user_id": "offline_user_1782464168331",
+      "movie_id": "65733",
+      "movie_title": "Doraemon",
+      "movie_thumbnail": "https://image.tmdb.org/t/p/w500/c2oiRa7V3bQzof4wVGzLXtWJ5QU.jpg",
+      "duration_min": 1,
+      "season": null,
+      "episode": null,
+      "createdAt": "2026-06-27T15:03:58.524Z"
+    },
+    {
+      "user_id": "offline_user_1782464168331",
+      "movie_id": "236994",
+      "movie_title": "Dragon Ball DAIMA",
+      "movie_thumbnail": "https://image.tmdb.org/t/p/w500/oUmWLyeko3kYdUr8DBLIsxwcugl.jpg",
+      "duration_min": 1,
+      "season": null,
+      "episode": null,
+      "createdAt": "2026-06-27T16:54:16.156Z"
+    },
+    {
+      "user_id": "offline_user_1782464168331",
+      "movie_id": "236994",
+      "movie_title": "Dragon Ball DAIMA",
+      "movie_thumbnail": "https://image.tmdb.org/t/p/w500/oUmWLyeko3kYdUr8DBLIsxwcugl.jpg",
+      "duration_min": 1,
+      "season": null,
+      "episode": null,
+      "createdAt": "2026-06-27T16:54:16.161Z"
+    },
+    {
+      "user_id": "offline_user_1782464168331",
+      "movie_id": "240411",
+      "movie_title": "Dan Da Dan",
+      "movie_thumbnail": "https://image.tmdb.org/t/p/w500/uNTrRKIOyKYISthoeizghtXPEOK.jpg",
+      "duration_min": 1,
+      "season": null,
+      "episode": null,
+      "createdAt": "2026-06-27T17:05:50.200Z"
+    },
+    {
+      "user_id": "offline_user_1782464168331",
+      "movie_id": "240411",
+      "movie_title": "Dan Da Dan",
+      "movie_thumbnail": "https://image.tmdb.org/t/p/w500/uNTrRKIOyKYISthoeizghtXPEOK.jpg",
+      "duration_min": 1,
+      "season": null,
+      "episode": null,
+      "createdAt": "2026-06-27T17:05:50.221Z"
+    },
+    {
+      "user_id": "offline_user_1782464168331",
+      "movie_id": "1242898",
+      "movie_title": "Predator: Badlands",
+      "movie_thumbnail": "https://image.tmdb.org/t/p/w500/82lM4GJ9uuNvNDOEpxFy77uv4Ak.jpg",
+      "duration_min": 1,
+      "season": null,
+      "episode": null,
+      "createdAt": "2026-06-27T17:06:11.328Z"
+    },
+    {
+      "user_id": "offline_user_1782464168331",
+      "movie_id": "1242898",
+      "movie_title": "Predator: Badlands",
+      "movie_thumbnail": "https://image.tmdb.org/t/p/w500/82lM4GJ9uuNvNDOEpxFy77uv4Ak.jpg",
+      "duration_min": 1,
+      "season": null,
+      "episode": null,
+      "createdAt": "2026-06-27T17:06:11.338Z"
+    },
+    {
+      "user_id": "offline_user_1782464168331",
+      "movie_id": "1108427",
+      "movie_title": "Moana",
+      "movie_thumbnail": "https://image.tmdb.org/t/p/w500/c6BPbkO5Npt1OdwttAxCFo06wtH.jpg",
+      "duration_min": 1,
+      "season": null,
+      "episode": null,
+      "createdAt": "2026-06-27T17:10:14.660Z"
+    },
+    {
+      "user_id": "offline_user_1782464168331",
+      "movie_id": "1108427",
+      "movie_title": "Moana",
+      "movie_thumbnail": "https://image.tmdb.org/t/p/w500/c6BPbkO5Npt1OdwttAxCFo06wtH.jpg",
+      "duration_min": 1,
+      "season": null,
+      "episode": null,
+      "createdAt": "2026-06-27T17:10:14.668Z"
+    },
+    {
+      "user_id": "offline_user_1782464168331",
+      "movie_id": "245842",
+      "movie_title": "Wistoria: Wand and Sword",
+      "movie_thumbnail": "https://image.tmdb.org/t/p/w500/n4VljCX22hbw3RwfxaY8FX8eLzN.jpg",
+      "duration_min": 1,
+      "season": null,
+      "episode": null,
+      "createdAt": "2026-06-27T17:10:29.507Z"
+    },
+    {
+      "user_id": "offline_user_1782464168331",
+      "movie_id": "245842",
+      "movie_title": "Wistoria: Wand and Sword",
+      "movie_thumbnail": "https://image.tmdb.org/t/p/w500/n4VljCX22hbw3RwfxaY8FX8eLzN.jpg",
+      "duration_min": 1,
+      "season": null,
+      "episode": null,
+      "createdAt": "2026-06-27T17:10:29.521Z"
+    },
+    {
+      "user_id": "offline_user_1782464168331",
+      "movie_id": "617126",
+      "movie_title": "The Fantastic 4: First Steps",
+      "movie_thumbnail": "https://image.tmdb.org/t/p/w500/s94NjfKkcSczZ1FembwmQZwsuwY.jpg",
+      "duration_min": 1,
+      "season": null,
+      "episode": null,
+      "createdAt": "2026-06-27T17:10:39.585Z"
+    },
+    {
+      "user_id": "offline_user_1782464168331",
+      "movie_id": "617126",
+      "movie_title": "The Fantastic 4: First Steps",
+      "movie_thumbnail": "https://image.tmdb.org/t/p/w500/s94NjfKkcSczZ1FembwmQZwsuwY.jpg",
+      "duration_min": 1,
+      "season": null,
+      "episode": null,
+      "createdAt": "2026-06-27T17:10:39.594Z"
+    }
+  ],
+  "likes": [
+    {
+      "user_id": "offline_user_1782464168331",
+      "movie_id": "1108427",
+      "movie_title": "Moana",
+      "movie_thumbnail": "https://image.tmdb.org/t/p/w500/c6BPbkO5Npt1OdwttAxCFo06wtH.jpg",
+      "movie_year": "2026",
+      "movie_genre": "Movie",
+      "added_at": "2026-06-27T09:45:26.139Z"
+    }
+  ]
+}

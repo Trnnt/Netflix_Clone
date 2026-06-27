@@ -132,3 +132,7 @@ export async function getAdminStats() { return authFetch('/admin/stats'); }
 export async function getAdminUsers() { return authFetch('/admin/users'); }
 export async function updateAdminUser(id, data) { return authFetch(`/admin/users/${id}`, { method: 'PUT', body: JSON.stringify(data) }); }
 export async function deleteAdminUser(id) { return authFetch(`/admin/users/${id}`, { method: 'DELETE' }); }
+
+// ─── EPISODES ─────────────────────────────────────────────────────────────────
+export async function getTvSeasons(id) { return apiFetch(`/movies/tv/${id}/seasons`); }
+export async function getSeasonEpisodes(id, num) { return apiFetch(`/movies/tv/${id}/season/${num}`); }

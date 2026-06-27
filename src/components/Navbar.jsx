@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Search, Bell, ChevronLeft, User, Bookmark, Download, Settings, LogOut, Menu } from 'lucide-react';
+import { socket } from '../services/movieApi';
 
 const NAV_ITEMS = ['Home','Anime','Cartoon','Hollywood','Wollywood','K-Drama','C-Drama','J-Drama'];
 
-const NOTIFICATIONS = [
+const INITIAL_NOTIFICATIONS = [
   { id:1, text:'New episode of Demon Slayer is out!',      time:'2h ago',  img:'https://images.unsplash.com/photo-1578632767115-351597cf2477?w=400&q=80' },
   { id:2, text:'Attack on Titan Final Season added',       time:'1d ago',  img:'https://images.unsplash.com/photo-1614854262318-831574f15f1f?w=400&q=80' },
   { id:3, text:'New K-Drama recommendations for you',      time:'2d ago',  img:'https://images.unsplash.com/photo-1611532736597-de2d4265fba3?w=400&q=80' },
@@ -16,6 +17,8 @@ const Navbar = ({ isScrolled, currentCategory, setCategory, onSearch, setIsLogge
   const [notifOpen,   setNotifOpen]   = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [hoveredNav,  setHoveredNav]  = useState(null);
+  const [notifications, setNotifications] = useState(INITIAL_NOTIFICATIONS);
+  const [unreadCount, setUnreadCount] = useState(0);
   const user = JSON.parse(localStorage.getItem('netflix_user') || '{"name": "User"}');
 
   const searchRef  = useRef(null);
@@ -27,6 +30,16 @@ const Navbar = ({ isScrolled, currentCategory, setCategory, onSearch, setIsLogge
   useEffect(() => {
     if (searchOpen) inputRef.current?.focus();
   }, [searchOpen]);
+
+  // Real-time notifications
+  useEffect(() => {
+    const handleNewNotif = (notif) => {
+      setNotifications(prev => [notif, ...prev]);
+      setUnreadCount(c => c + 1);
+    };
+    socket.on('new_notification', handleNewNotif);
+    return () => socket.off('new_notification', handleNewNotif);
+  }, []);
 
   // Close all dropdowns on Escape or outside click
   useEffect(() => {
@@ -125,16 +138,21 @@ const Navbar = ({ isScrolled, currentCategory, setCategory, onSearch, setIsLogge
         <div ref={notifRef} className="notif-wrap">
           <button
             className="icon-btn notif-btn"
-            onClick={() => { setNotifOpen(n => !n); setProfileOpen(false); }}
+            onClick={() => { 
+              setNotifOpen(n => !n); 
+              setProfileOpen(false); 
+              if (!notifOpen) setUnreadCount(0);
+            }}
           >
             <Bell size={19} />
-            <span className="notif-dot" />
+            {unreadCount > 0 && <span className="notif-dot" />}
           </button>
 
           {notifOpen && (
             <div className="dropdown notif-dropdown">
               <p className="dropdown-heading">NOTIFICATIONS</p>
-              {NOTIFICATIONS.map(n => (
+              {notifications.length === 0 ? <p className="notif-text" style={{padding: '10px 15px', color:'#aaa'}}>No new notifications</p> : null}
+              {notifications.map(n => (
                 <div key={n.id} className="notif-item">
                   <img src={n.img} alt="" className="notif-thumb" />
                   <div>

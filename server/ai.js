@@ -5,9 +5,7 @@ const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
 // ─── MOVIE CONTEXT BUILDER ────────────────────────────────────────────────────
 // Takes a reference to the live movie cache and a user query, finds relevant movies
-// ─── MOVIE CONTEXT BUILDER ────────────────────────────────────────────────────
-// Takes a reference to the live movie cache and a user query, finds relevant movies
-export function buildMovieContext(movieCache, query = '', premiumExclusives = []) {
+function buildMovieContext(movieCache, query = '', premiumExclusives = []) {
     const allMovies = [...premiumExclusives];
     for (const [key, movies] of Object.entries(movieCache)) {
         if (Array.isArray(movies)) {
@@ -90,7 +88,7 @@ export function buildMovieContext(movieCache, query = '', premiumExclusives = []
 }
 
 // ─── AI CHAT ──────────────────────────────────────────────────────────────────
-export async function chatWithAI(movieCache, messages, userMessage, userName = 'User') {
+async function chatWithAI(movieCache, messages, userMessage, userName = 'User') {
     const premiumExclusives = [
         { id: 10, title: "Put Your Head on My Shoulder", year: 2019, rating: 8.1, genre: "Romance • Youth", tags: ["C-Drama", "Romance"], desc: "Si Tu Mo's life is shaken up when she's forced to live with a physics genius.", type: "tv" },
         { id: 11, title: "Love is Sweet", year: 2020, rating: 8.4, genre: "Romance • Business", tags: ["C-Drama", "Romance"], desc: "Jiang Jun meets her childhood playmate in the workplace, as a rival.", type: "tv" },
@@ -175,7 +173,7 @@ Style: Short, sharp, premium. Always **bold** recommended titles.`;
 }
 
 // ─── SEARCH MOVIES (HELPER FOR RECOMMENDATIONS) ──────────────────────────────
-export function searchMovies(movieCache, query, limit = 8) {
+function searchMovies(movieCache, query, limit = 8) {
     try {
         const { topMovies } = buildMovieContext(movieCache, query);
         return topMovies.slice(0, limit);
@@ -184,6 +182,8 @@ export function searchMovies(movieCache, query, limit = 8) {
         return [];
     }
 }
+
+export { chatWithAI, searchMovies, buildMovieContext };
 
 
 

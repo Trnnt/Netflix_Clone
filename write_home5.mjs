@@ -203,5 +203,5 @@ body{background:var(--bg);color:#fff;font-family:'DM Sans',sans-serif;overflow-x
 \`;
 `;
 
-appendFileSync('src/pages/HomePage.jsx', css);
+appendFileSync('c:/HTML(my code)/netflix/src/pages/HomePage.jsx', css);
 console.log('CSS part done');

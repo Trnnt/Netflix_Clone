@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { trackWatch, trackDownload, getCurrentUser } from "../services/movieApi.js";
-import { Play, Info, Plus, ThumbsUp, Bell, Search, ChevronLeft, ChevronRight, X, Volume2, VolumeX, Star, Clock, Download, Share2, Bookmark, Film, User, Users, Settings, LogOut, Menu, Sparkles, Check } from "lucide-react";
+import { trackWatch, trackDownload, getCurrentUser, getTvSeasons, getSeasonEpisodes } from "../services/movieApi.js";
+import { Play, Info, Plus, ThumbsUp, Bell, Search, ChevronLeft, ChevronRight, X, Volume2, VolumeX, Star, Clock, Download, Share2, Bookmark, Film, User, Users, Settings, LogOut, Menu, Sparkles, Check, Save, Activity, ChevronDown, RotateCcw, RotateCw } from "lucide-react";
 import AiChat from "../components/AiChat.jsx";
 
 /* ─── API & TOAST ────────────────────────────────────────── */
@@ -103,7 +103,7 @@ function Particles() {
 const Aurora = () => (<div style={{ position: "fixed", inset: 0, zIndex: 0, pointerEvents: "none", overflow: "hidden" }}><div className="au1" /><div className="au2" /><div className="au3" /></div>);
 
 /* ─── NAVBAR ─────────────────────────────────────────────── */
-function Navbar({ scrolled, category, setCategory, onSearch, setActiveModal, onLogout }) {
+function Navbar({ scrolled, category, setCategory, onSearch, setActiveModal, onLogout, trending, anime, onMovieSelect }) {
   const [srchOpen, setSrchOpen] = useState(false);
   const [q, setQ] = useState("");
   const [notifOpen, setNotifOpen] = useState(false);
@@ -129,6 +129,11 @@ function Navbar({ scrolled, category, setCategory, onSearch, setActiveModal, onL
   ];
   const user = JSON.parse(localStorage.getItem('netflix_user') || '{"name": "User"}');
   
+  const combinedNotifs = [
+    ...(trending && trending.length > 0 ? trending.slice(0, 2).map(m => ({ ...m, notifType: 'release' })) : []),
+    ...(anime && anime.length > 0 ? anime.slice(0, 2).map(m => ({ ...m, notifType: 'anime episode' })) : [])
+  ];
+
   return (
     <nav className={"nb" + (scrolled ? " sc" : "")}>
       <div className="nb-l">
@@ -152,7 +157,17 @@ function Navbar({ scrolled, category, setCategory, onSearch, setActiveModal, onL
           <button className="ib nb2" onClick={() => { setNotifOpen(n => !n); setProfOpen(false); }}><Bell size={19} /><span className="nd" /></button>
           {notifOpen && <div className="dd ndd">
             <p className="ddh">NOTIFICATIONS</p>
-            {NOTIFS.map(n => <div key={n.id} className="ni"><img src={n.img} alt="" className="nth" /><div><p className="ntx">{n.text}</p><p className="ntm">{n.time}</p></div></div>)}
+            {combinedNotifs.length > 0 ? combinedNotifs.map((m, i) => (
+              <div key={m.id || i} className="ni" onClick={() => { setNotifOpen(false); onMovieSelect && onMovieSelect(m); }} style={{ cursor: 'pointer' }}>
+                <img src={m.thumbnail ? m.thumbnail : "https://upload.wikimedia.org/wikipedia/commons/0/0b/Netflix-avatar.png"} alt="" className="nth" style={{ objectFit: 'cover' }} />
+                <div>
+                  <p className="ntx">New {m.notifType}: {m.title} is now available!</p>
+                  <p className="ntm">Just now</p>
+                </div>
+              </div>
+            )) : (
+              <div className="ni" style={{ padding: '20px', textAlign: 'center' }}><p className="ntx" style={{ opacity: 0.6 }}>No new notifications</p></div>
+            )}
           </div>}
         </div>
         <div ref={pr} className="drop-a">
@@ -167,9 +182,12 @@ function Navbar({ scrolled, category, setCategory, onSearch, setActiveModal, onL
               <button key={item.label} className={"pmi" + (item.modal === "signout" ? " so" : "")} onClick={() => {
                 setProfOpen(false);
                 if (item.modal === "signout") {
-                  localStorage.removeItem('netflix_token');
-                  localStorage.removeItem('netflix_user');
-                  onLogout();
+         const handleLogout = () => {
+    localStorage.removeItem("netflix_token");
+    localStorage.removeItem("netflix_user");
+    window.location.href = "/"; // Force full reload to reset all states
+  };
+                  handleLogout(); // Call the function
                 } else {
                   setActiveModal(item.modal);
                 }
@@ -213,7 +231,7 @@ function Hero({ movie, onOpen, onPlay, heroIdx, heroCount, onDotClick }) {
 
   useEffect(() => {
     if (!movie) return;
-    authFetch(`/mylist/check/${movie.id}`).then(r => setInList(r.inList)).catch(() => {});
+    authFetch(`/mylist/${movie.id}/check`).then(r => setInList(r.inList)).catch(() => {});
     authFetch(`/likes/${movie.id}/check`).then(r => setLiked(r.liked)).catch(() => {});
   }, [movie?.id]);
 
@@ -304,18 +322,20 @@ function Card({ movie, onOpen, onPlay, rank, pos }) {
   // Check if already in list/liked on hover
   useEffect(() => {
     if (hov) {
-      authFetch(`/mylist/check/${movie.id}`).then(res => setList(res.inList)).catch(() => { });
+      authFetch(`/mylist/${movie.id}/check`).then(res => setList(res.inList)).catch(() => { });
       authFetch(`/likes/${movie.id}/check`).then(res => setLiked(res.liked)).catch(() => { });
     }
   }, [hov, movie.id]);
 
   const toggleList = async (e) => {
     e.stopPropagation();
+    const prev = list;
+    setList(!prev);
+    if (!prev) { setListAnim(true); setTimeout(() => setListAnim(false), 600); showToast('✅ Added to Watchlist!'); }
     try {
       const genre = (movie.tags || [])[0] || movie.genre || '';
-      if (list) {
+      if (prev) {
         await authFetch(`/mylist/${movie.id}`, { method: 'DELETE' });
-        setList(false);
       } else {
         const body = JSON.stringify({
           movie_id: movie.id, movie_title: movie.title, movie_thumbnail: movie.thumbnail,
@@ -323,26 +343,24 @@ function Card({ movie, onOpen, onPlay, rank, pos }) {
         });
         await authFetch('/mylist', { method: 'POST', body });
         await authFetch('/downloads', { method: 'POST', body }).catch(() => { });
-        setList(true); setListAnim(true); setTimeout(() => setListAnim(false), 600);
-        showToast('✅ Added to Watchlist!');
         const u = getCurrentUser(); if (u) trackDownload(u, movie);
       }
-    } catch { showToast('⚠️ Sign in to manage list'); }
+    } catch { setList(prev); showToast('⚠️ Sign in to manage list'); }
   };
 
   const toggleLike = async (e) => {
     e.stopPropagation();
+    const prev = liked;
+    setLiked(!prev);
+    if (!prev) { setLikeAnim(true); setTimeout(() => setLikeAnim(false), 600); showToast('❤️ Liked!'); }
     try {
       const genre = (movie.tags || [])[0] || movie.genre || '';
-      if (liked) {
+      if (prev) {
         await authFetch(`/likes/${movie.id}`, { method: 'DELETE' });
-        setLiked(false);
       } else {
         await authFetch('/likes', { method: 'POST', body: JSON.stringify({ movie_id: movie.id, movie_title: movie.title, movie_thumbnail: movie.thumbnail, movie_year: movie.year || '', movie_genre: genre }) });
-        setLiked(true); setLikeAnim(true); setTimeout(() => setLikeAnim(false), 600);
-        showToast('❤️ Liked!');
       }
-    } catch { showToast('⚠️ Sign in to like'); }
+    } catch { setLiked(prev); showToast('⚠️ Sign in to like'); }
   };
 
   const origin = pos === 'first' ? '0% 50%' : pos === 'last' ? '100% 50%' : '50% 50%';
@@ -353,7 +371,7 @@ function Card({ movie, onOpen, onPlay, rank, pos }) {
       onClick={() => onOpen(movie)}>
       {rank && <span className="rnk">{rank}</span>}
       <div className="cib">
-        <img src={movie.thumbnail} alt={movie.title} className="cimg" onError={e => { e.target.src = "https://via.placeholder.com/400x225/141414/e50914?text=" + encodeURIComponent(movie.title || '?'); }} />
+        <img src={movie.thumbnail || "https://upload.wikimedia.org/wikipedia/commons/0/0b/Netflix-avatar.png"} alt={movie.title} className="cimg" onError={e => { e.target.src = "https://upload.wikimedia.org/wikipedia/commons/0/0b/Netflix-avatar.png"; }} style={{ objectFit: 'cover' }} />
         <div className="cgr" />
         <div className="card-play-ov"><Play size={26} fill="#fff" color="#fff" /></div>
         <div className="card-hd-badge">HD</div>
@@ -422,175 +440,222 @@ const FREE_VIDEOS = {
 };
 
 function getVideoForMovie(movie) {
+  // If it's a TV show and has episode data, customize the title/id
+  const isTv = movie?.type === 'tv' || movie?.media_type === 'tv';
+  const ep = movie?.currentEpisode;
+  
   const g = (movie?.genre || '').toLowerCase();
   const tags = (movie?.tags || []).map(t => t.toLowerCase()).join(' ');
-  if (tags.includes('anime') || g === 'anime') return FREE_VIDEOS.anime;
-  if (tags.includes('cartoon') || g === 'cartoon') return FREE_VIDEOS.cartoon;
-  if (tags.includes('k-drama') || g === 'kdrama') return FREE_VIDEOS.kdrama;
-  if (tags.includes('j-drama') || g === 'jdrama') return FREE_VIDEOS.jdrama;
-  if (tags.includes('c-drama') || g === 'cdrama') return FREE_VIDEOS.cdrama;
-  if (tags.includes('wollywood') || g === 'wollywood') return FREE_VIDEOS.wollywood;
-  if (tags.includes('hollywood') || g === 'hollywood') return FREE_VIDEOS.hollywood;
-  return FREE_VIDEOS.default;
+  
+  let base;
+  if (tags.includes('anime') || g === 'anime') base = FREE_VIDEOS.anime;
+  else if (tags.includes('cartoon') || g === 'cartoon') base = FREE_VIDEOS.cartoon;
+  else if (tags.includes('k-drama') || g === 'kdrama') base = FREE_VIDEOS.kdrama;
+  else if (tags.includes('j-drama') || g === 'jdrama') base = FREE_VIDEOS.jdrama;
+  else if (tags.includes('c-drama') || g === 'cdrama') base = FREE_VIDEOS.cdrama;
+  else if (tags.includes('wollywood') || g === 'wollywood') base = FREE_VIDEOS.wollywood;
+  else if (tags.includes('hollywood') || g === 'hollywood') base = FREE_VIDEOS.hollywood;
+  else base = FREE_VIDEOS.default;
+
+  if (isTv && ep) {
+    return {
+      ...base,
+      title: movie.title,
+      ep: `Season ${movie.seasonNum} : Episode ${ep.episode_number} — ${ep.name}`,
+      duration: ep.runtime || base.duration
+    };
+  }
+  return base;
 }
 
 /* ─── VIDEO PLAYER ───────────────────────────────────────── */
 function VideoPlayer({ movie, onClose }) {
-  const vidRef = useRef(null);
-  const ctrRef = useRef(null);
-  const hideTimer = useRef(null);
-  const [playing, setPlaying] = useState(true);
-  const [muted, setMuted] = useState(false);
-  const [vol, setVol] = useState(1);
-  const [cur, setCur] = useState(0);
-  const [dur, setDur] = useState(0);
-  const [full, setFull] = useState(false);
-  const [showCtrl, setShowCtrl] = useState(true);
-  const [loading, setLoading] = useState(true);
-  const [showVol, setShowVol] = useState(false);
-  const src = getVideoForMovie(movie);
+  const isTV = movie.type === 'tv' || movie.episodes === 'TV Series' || (movie.episodes || '').includes('Season');
+  const [selSeason, setSelSeason] = useState(movie.seasonNum || 1);
+  const [selEp, setSelEp] = useState(movie.currentEpisode?.episode_number || 1);
+  const [seasons, setSeasons] = useState([]);
+  const [eps, setEps] = useState([]);
+  const [embedIdx, setEmbedIdx] = useState(0);
+  const [loadingEps, setLoadingEps] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
 
   useEffect(() => {
     document.body.style.overflow = 'hidden';
-    return () => { document.body.style.overflow = ''; cancelAnimationFrame(hideTimer.current); };
+    return () => { document.body.style.overflow = ''; };
   }, []);
 
-  const resetHide = () => {
-    setShowCtrl(true);
-    clearTimeout(hideTimer.current);
-    hideTimer.current = setTimeout(() => { if (playing) setShowCtrl(false); }, 3000);
+  useEffect(() => {
+    if (movie) { const u = getCurrentUser(); if (u) trackWatch(u, movie); }
+  }, [movie]);
+
+  // Fetch seasons list for TV
+  useEffect(() => {
+    if (!isTV) return;
+    fetch(`/api/movies/tv/${movie.id}/seasons`)
+      .then(r => r.json())
+      .then(d => setSeasons(d.seasons || []))
+      .catch(() => setSeasons([{ season_number: 1, name: 'Season 1', episode_count: 12 }]));
+  }, [movie.id, isTV]);
+
+  // Fetch episodes when season changes
+  useEffect(() => {
+    if (!isTV) return;
+    setLoadingEps(true);
+    fetch(`/api/movies/tv/${movie.id}/season/${selSeason}`)
+      .then(r => r.json())
+      .then(data => { setEps(Array.isArray(data) ? data : []); setLoadingEps(false); })
+      .catch(() => { setEps([]); setLoadingEps(false); });
+  }, [movie.id, selSeason, isTV]);
+
+  // Build working embed URLs — tried and tested providers
+  const getEmbeds = () => {
+    const id = movie.id;
+    if (isTV) {
+      const s = selSeason, e = selEp;
+      return [
+        `https://vidsrc.net/embed/tv/${id}/${s}/${e}`,
+        `https://autoembed.cc/tv/tmdb/${id}-${s}-${e}`,
+        `https://moviesapi.club/tv/${id}-${s}-${e}`,
+        `https://player.videasy.net/tv/${id}/${s}/${e}`,
+        `https://multiembed.mov/?video_id=${id}&tmdb=1&s=${s}&e=${e}`,
+      ];
+    } else {
+      return [
+        `https://vidsrc.net/embed/movie/${id}`,
+        `https://autoembed.cc/movie/tmdb/${id}`,
+        `https://moviesapi.club/movie/${id}`,
+        `https://player.videasy.net/movie/${id}`,
+        `https://multiembed.mov/?video_id=${id}&tmdb=1`,
+      ];
+    }
   };
 
-  useEffect(() => {
-    resetHide();
-    if (playing && movie) {
-      const u = getCurrentUser();
-      if (u) trackWatch(u, movie);
-    }
-  }, [playing, movie]);
-
-  const fmt = s => { const m = Math.floor(s / 60); const ss = Math.floor(s % 60); return m + ':' + (ss < 10 ? '0' : '') + ss; };
-
-  const togglePlay = () => { const v = vidRef.current; if (!v) return; playing ? v.pause() : v.play(); setPlaying(p => !p); };
-  const skip = n => { if (vidRef.current) vidRef.current.currentTime = Math.max(0, Math.min(vidRef.current.currentTime + n, dur)); };
-  const toggleFull = () => { if (!document.fullscreenElement) { ctrRef.current?.requestFullscreen(); setFull(true); } else { document.exitFullscreen(); setFull(false); } };
-  const toggleMute = () => { if (vidRef.current) { vidRef.current.muted = !muted; setMuted(m => !m); } };
-
-  useEffect(() => {
-    const h = e => {
-      if (e.key === ' ' || e.key === 'k') togglePlay();
-      if (e.key === 'ArrowRight') skip(10);
-      if (e.key === 'ArrowLeft') skip(-10);
-      if (e.key === 'ArrowUp') { const nv = Math.min(1, (vol || 0) + .1); if (vidRef.current) vidRef.current.volume = nv; setVol(nv); }
-      if (e.key === 'ArrowDown') { const nv = Math.max(0, (vol || 0) - .1); if (vidRef.current) vidRef.current.volume = nv; setVol(nv); }
-      if (e.key === 'm') toggleMute();
-      if (e.key === 'f') toggleFull();
-      if (e.key === 'Escape' && !document.fullscreenElement) onClose();
-    };
-    window.addEventListener('keydown', h);
-    return () => window.removeEventListener('keydown', h);
-  }, [playing, muted, vol, dur]);
-
-  const prog = dur ? (cur / dur) * 100 : 0;
+  const embeds = getEmbeds();
+  const currentEmbed = embeds[embedIdx] || embeds[0];
+  const epLabel = isTV ? `Season ${selSeason} · Ep ${selEp}` : 'Movie';
 
   return (
-    <div ref={ctrRef} onMouseMove={resetHide} onClick={togglePlay}
-      style={{ position: 'fixed', inset: 0, background: '#000', zIndex: 99999, display: 'flex', flexDirection: 'column', cursor: showCtrl ? 'default' : 'none', userSelect: 'none' }}>
+    <div style={{ position: 'fixed', inset: 0, background: '#0a0a0a', zIndex: 99999, display: 'flex', flexDirection: 'column', fontFamily: 'Inter, sans-serif' }}>
 
-      {/* VIDEO */}
-      <video ref={vidRef} src={src.url} autoPlay
-        style={{ width: '100%', height: '100%', objectFit: 'contain' }}
-        onTimeUpdate={e => setCur(e.target.currentTime)}
-        onDurationChange={e => setDur(e.target.duration)}
-        onWaiting={() => setLoading(true)} onCanPlay={() => setLoading(false)}
-        onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)}
-        onEnded={() => setPlaying(false)} />
-
-      {/* LOADING SPINNER */}
-      {loading && <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
-        <div style={{ width: 54, height: 54, border: '4px solid rgba(229,9,20,.25)', borderTopColor: '#e50914', borderRadius: '50%', animation: 'spin .8s linear infinite' }} />
-      </div>}
-
-      {/* TOP BAR */}
-      <div onClick={e => e.stopPropagation()} style={{ position: 'absolute', top: 0, left: 0, right: 0, padding: '20px 28px', background: 'linear-gradient(to bottom,rgba(0,0,0,.85),transparent)', display: 'flex', alignItems: 'center', gap: 18, transition: 'opacity .3s', opacity: showCtrl ? 1 : 0, pointerEvents: showCtrl ? 'auto' : 'none' }}>
-        <button onClick={e => { e.stopPropagation(); onClose(); }} style={{ background: 'rgba(255,255,255,.12)', border: 'none', color: '#fff', width: 40, height: 40, borderRadius: '50%', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, backdropFilter: 'blur(6px)' }}>←</button>
-        <div>
-          <p style={{ fontSize: 11, letterSpacing: 2, color: 'rgba(255,255,255,.5)', textTransform: 'uppercase', margin: 0 }}>Now Playing</p>
-          <h2 style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 'clamp(1.2rem,2.5vw,1.8rem)', color: '#fff', margin: 0 }}>{movie?.title}</h2>
-          <p style={{ fontSize: 12, color: 'rgba(255,255,255,.4)', margin: 0 }}>{src.ep} · {movie?.year}</p>
+      {/* ── TOP BAR ── */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '12px 20px', background: '#111', borderBottom: '1px solid #222', flexShrink: 0 }}>
+        <button onClick={onClose} style={{ background: 'rgba(255,255,255,.08)', border: '1px solid rgba(255,255,255,.1)', color: '#fff', width: 36, height: 36, borderRadius: '50%', cursor: 'pointer', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>←</button>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <h2 style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 'clamp(1rem,2vw,1.5rem)', color: '#fff', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{movie.title}</h2>
+            <span style={{ background: isTV ? '#6441a5' : '#e50914', color: '#fff', fontSize: 10, padding: '2px 8px', borderRadius: 4, fontWeight: 700, letterSpacing: 1, flexShrink: 0 }}>{isTV ? 'SERIES' : 'MOVIE'}</span>
+          </div>
+          <p style={{ margin: 0, fontSize: 12, color: 'rgba(255,255,255,.4)' }}>{epLabel} · {movie.year}</p>
         </div>
-        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ background: 'rgba(229,9,20,.9)', padding: '3px 10px', borderRadius: 3, fontSize: 11, fontWeight: 700 }}>HD 4K</span>
-          <span style={{ border: '1px solid rgba(255,255,255,.3)', padding: '3px 8px', borderRadius: 3, fontSize: 11, color: 'rgba(255,255,255,.65)' }}>{movie?.maturity || 'PG-13'}</span>
-        </div>
+
+        {/* ── TV: show numbered server buttons ── */}
+        {isTV && (
+          <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+            {embeds.map((_, i) => (
+              <button key={i} onClick={() => setEmbedIdx(i)}
+                style={{ background: embedIdx === i ? '#6441a5' : 'rgba(255,255,255,.08)', border: '1px solid rgba(255,255,255,.12)', color: '#fff', padding: '5px 12px', borderRadius: 16, cursor: 'pointer', fontSize: 11, fontWeight: 700, letterSpacing: 0.5 }}>
+                S{i + 1}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* ── MOVIE: only show a subtle "Not working?" fallback button ── */}
+        {!isTV && (
+          <div style={{ display: 'flex', gap: 6, flexShrink: 0, alignItems: 'center' }}>
+            {embedIdx > 0 && (
+              <span style={{ fontSize: 11, color: '#888' }}>Server {embedIdx + 1} of {embeds.length}</span>
+            )}
+            {embedIdx < embeds.length - 1 && (
+              <button onClick={() => setEmbedIdx(i => i + 1)}
+                style={{ background: 'rgba(255,165,0,.15)', border: '1px solid rgba(255,165,0,.3)', color: '#ffa500', padding: '5px 14px', borderRadius: 16, cursor: 'pointer', fontSize: 11, fontWeight: 700 }}>
+                ⚠ Not Working? Try Next
+              </button>
+            )}
+            {embedIdx === embeds.length - 1 && (
+              <button onClick={() => setEmbedIdx(0)}
+                style={{ background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.1)', color: '#aaa', padding: '5px 14px', borderRadius: 16, cursor: 'pointer', fontSize: 11 }}>
+                ↺ Restart
+              </button>
+            )}
+          </div>
+        )}
+
+        {isTV && (
+          <button onClick={() => setSidebarOpen(o => !o)}
+            style={{ background: sidebarOpen ? '#6441a5' : 'rgba(255,255,255,.08)', border: '1px solid rgba(255,255,255,.12)', color: '#fff', padding: '5px 12px', borderRadius: 16, cursor: 'pointer', fontSize: 11, fontWeight: 700, flexShrink: 0 }}>
+            {sidebarOpen ? '⊟ Episodes' : '☰ Episodes'}
+          </button>
+        )}
       </div>
 
-      {/* CENTER PLAY ICON flash */}
-      {!playing && <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
-        <div style={{ width: 80, height: 80, background: 'rgba(0,0,0,.6)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(8px)' }}>
-          <Play size={36} fill="#fff" color="#fff" style={{ marginLeft: 4 }} />
+      {/* ── MAIN BODY ── */}
+      <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+
+        {/* ── VIDEO AREA ── */}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          <iframe
+            key={`${currentEmbed}-${selSeason}-${selEp}`}
+            src={currentEmbed}
+            style={{ flex: 1, width: '100%', border: 'none', background: '#000' }}
+            allowFullScreen
+            allow="autoplay; fullscreen; picture-in-picture"
+          />
         </div>
-      </div>}
 
-      {/* BOTTOM CONTROLS */}
-      <div onClick={e => e.stopPropagation()} style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '0 24px 20px', background: 'linear-gradient(to top,rgba(0,0,0,.9),transparent)', transition: 'opacity .3s', opacity: showCtrl ? 1 : 0, pointerEvents: showCtrl ? 'auto' : 'none' }}>
+        {/* ── EPISODE SIDEBAR (TV only) ── */}
+        {isTV && sidebarOpen && (
+          <div style={{ width: 280, background: '#111', borderLeft: '1px solid #222', display: 'flex', flexDirection: 'column', overflow: 'hidden', flexShrink: 0 }}>
 
-        {/* SEEK BAR */}
-        <div style={{ marginBottom: 14, cursor: 'pointer' }} onClick={e => { const r = e.currentTarget.getBoundingClientRect(); const p = (e.clientX - r.left) / r.width; if (vidRef.current) vidRef.current.currentTime = p * dur; }}>
-          <div style={{ height: 4, background: 'rgba(255,255,255,.25)', borderRadius: 2, position: 'relative', transition: 'height .15s' }}
-            onMouseEnter={e => e.currentTarget.style.height = '6px'} onMouseLeave={e => e.currentTarget.style.height = '4px'}>
-            <div style={{ width: prog + '%', height: '100%', background: '#e50914', borderRadius: 2, position: 'relative' }}>
-              <div style={{ position: 'absolute', right: -6, top: '50%', transform: 'translateY(-50%)', width: 12, height: 12, background: '#e50914', borderRadius: '50%', boxShadow: '0 0 6px rgba(229,9,20,.8)' }} />
+            {/* Season selector */}
+            <div style={{ padding: '12px 14px', borderBottom: '1px solid #222', flexShrink: 0 }}>
+              <p style={{ margin: '0 0 8px', fontSize: 11, color: '#888', textTransform: 'uppercase', letterSpacing: 1 }}>Season</p>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                {seasons.length > 0 ? seasons.map(s => (
+                  <button key={s.season_number} onClick={() => { setSelSeason(s.season_number); setSelEp(1); }}
+                    style={{ background: selSeason === s.season_number ? '#e50914' : 'rgba(255,255,255,.08)', border: '1px solid rgba(255,255,255,.1)', color: '#fff', padding: '4px 12px', borderRadius: 12, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
+                    {s.season_number}
+                  </button>
+                )) : (
+                  <button style={{ background: '#e50914', border: 'none', color: '#fff', padding: '4px 12px', borderRadius: 12, fontSize: 12, fontWeight: 600 }}>1</button>
+                )}
+              </div>
             </div>
+
+            {/* Episodes list */}
+            <div style={{ flex: 1, overflowY: 'auto', padding: '8px 0' }}>
+              {loadingEps ? (
+                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 80 }}>
+                  <div style={{ width: 28, height: 28, border: '3px solid rgba(255,255,255,.1)', borderTop: '3px solid #e50914', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+                </div>
+              ) : eps.length === 0 ? (
+                // Show numbered episode buttons if TMDB has no episode data
+                Array.from({ length: 12 }, (_, i) => i + 1).map(n => (
+                  <button key={n} onClick={() => setSelEp(n)}
+                    style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%', background: selEp === n ? 'rgba(229,9,20,.18)' : 'transparent', border: 'none', borderLeft: selEp === n ? '3px solid #e50914' : '3px solid transparent', color: '#fff', padding: '10px 16px', cursor: 'pointer', textAlign: 'left' }}>
+                    <span style={{ width: 28, height: 28, borderRadius: '50%', background: selEp === n ? '#e50914' : 'rgba(255,255,255,.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, flexShrink: 0 }}>{n}</span>
+                    <span style={{ fontSize: 13, color: selEp === n ? '#fff' : '#aaa' }}>Episode {n}</span>
+                    {selEp === n && <span style={{ marginLeft: 'auto', fontSize: 14 }}>▶</span>}
+                  </button>
+                ))
+              ) : (
+                eps.map(ep => (
+                  <button key={ep.episode_number} onClick={() => setSelEp(ep.episode_number)}
+                    style={{ display: 'flex', alignItems: 'flex-start', gap: 12, width: '100%', background: selEp === ep.episode_number ? 'rgba(229,9,20,.18)' : 'transparent', border: 'none', borderLeft: selEp === ep.episode_number ? '3px solid #e50914' : '3px solid transparent', color: '#fff', padding: '10px 16px', cursor: 'pointer', textAlign: 'left' }}>
+                    <span style={{ width: 28, height: 28, borderRadius: '50%', background: selEp === ep.episode_number ? '#e50914' : 'rgba(255,255,255,.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, flexShrink: 0, marginTop: 2 }}>{ep.episode_number}</span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: selEp === ep.episode_number ? '#fff' : '#ccc', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{ep.name || `Episode ${ep.episode_number}`}</p>
+                      <p style={{ margin: '2px 0 0', fontSize: 11, color: '#555' }}>{ep.runtime || '24 min'}</p>
+                    </div>
+                    {selEp === ep.episode_number && <span style={{ fontSize: 14, marginTop: 4, color: '#e50914' }}>▶</span>}
+                  </button>
+                ))
+              )}
+            </div>
+            <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6, fontSize: 12, color: 'rgba(255,255,255,.5)' }}>
-            <span>{fmt(cur)}</span><span>{fmt(dur)}</span>
-          </div>
-        </div>
-
-        {/* CONTROL BUTTONS */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          {/* Play/Pause */}
-          <button onClick={togglePlay} style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer', padding: '6px 10px', display: 'flex', borderRadius: 4, transition: 'background .15s' }}
-            onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,.12)'} onMouseLeave={e => e.currentTarget.style.background = 'none'}>
-            {playing ? <span style={{ fontSize: 18 }}>⏸</span> : <Play size={20} fill="#fff" color="#fff" />}
-          </button>
-          {/* Skip back */}
-          <button onClick={() => skip(-10)} title="−10s" style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,.75)', cursor: 'pointer', padding: '6px 8px', fontSize: 12, display: 'flex', alignItems: 'center', gap: 3, borderRadius: 4 }}
-            onMouseEnter={e => e.currentTarget.style.color = '#fff'} onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,.75)'}>
-            <span style={{ fontSize: 16 }}>⟨⟨</span> 10
-          </button>
-          {/* Skip fwd */}
-          <button onClick={() => skip(10)} title="+10s" style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,.75)', cursor: 'pointer', padding: '6px 8px', fontSize: 12, display: 'flex', alignItems: 'center', gap: 3, borderRadius: 4 }}
-            onMouseEnter={e => e.currentTarget.style.color = '#fff'} onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,.75)'}>
-            10 <span style={{ fontSize: 16 }}>⟩⟩</span>
-          </button>
-          {/* Volume */}
-          <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }} onMouseEnter={() => setShowVol(true)} onMouseLeave={() => setShowVol(false)}>
-            <button onClick={toggleMute} style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer', padding: '6px 8px', display: 'flex', borderRadius: 4 }}>
-              {muted || vol === 0 ? <VolumeX size={18} /> : <Volume2 size={18} />}
-            </button>
-            {showVol && <input type="range" min={0} max={1} step={0.05} value={muted ? 0 : vol} style={{ width: 80, accentColor: '#e50914' }}
-              onChange={e => { const v = parseFloat(e.target.value); if (vidRef.current) vidRef.current.volume = v; setVol(v); setMuted(v === 0); }} />}
-          </div>
-
-          {/* Time */}
-          <span style={{ fontSize: 13, color: 'rgba(255,255,255,.6)', marginLeft: 4 }}>{fmt(cur)} <span style={{ opacity: .4 }}>/</span> {fmt(dur)}</span>
-
-          <div style={{ flex: 1 }} />
-
-          {/* Episode info */}
-          <span style={{ fontSize: 12, color: 'rgba(255,255,255,.4)', marginRight: 8 }}>{src.ep}</span>
-
-          {/* Fullscreen */}
-          <button onClick={toggleFull} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,.75)', cursor: 'pointer', padding: '6px 8px', display: 'flex', fontSize: 18, borderRadius: 4 }}
-            onMouseEnter={e => e.currentTarget.style.color = '#fff'} onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,.75)'}>
-            {full ? '⊡' : '⛶'}
-          </button>
-        </div>
+        )}
       </div>
-
-      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
     </div>
   );
 }
@@ -601,23 +666,87 @@ function MovieModal({ movie, onClose, onPlay }) {
   const [list, setList] = useState(false);
   const [liked, setLiked] = useState(false);
   const [sim, setSim] = useState([]);
+  const [seasons, setSeasons] = useState([]);
+  const [selS, setSelS] = useState(1);
+  const [showS, setShowS] = useState(false);
+  const [eps, setEps] = useState([]);
+  const [loadingEps, setLoadingEps] = useState(false);
+  const [trailerKey, setTrailerKey] = useState(null);
+  const [playingTrailer, setPlayingTrailer] = useState(false);
+
+  const handlePlayTrailer = async () => {
+    if (playingTrailer) { setPlayingTrailer(false); return; }
+    try {
+      const res = await fetch(`http://localhost:5000/api/movies/${movie.id}/trailer?type=${movie.type || 'movie'}`);
+      const data = await res.json();
+      if (data.youtubeKey) {
+        setTrailerKey(data.youtubeKey);
+        setPlayingTrailer(true);
+      } else {
+        alert('Trailer not found for this title.');
+      }
+    } catch { alert('Trailer not found for this title.'); }
+  };
+
+  useEffect(() => {
+    // Check if it's a TV show or has episodes meta
+    const isTv = movie.type === 'tv' || movie.media_type === 'tv' || String(movie.episodes || '').toLowerCase().includes('season');
+    if (isTv) {
+      getTvSeasons(movie.id).then(res => {
+        setSeasons(res.seasons || []);
+        if (res.seasons?.length > 0) setSelS(res.seasons[0].season_number);
+      }).catch(() => { });
+    }
+  }, [movie.id]);
+
+  useEffect(() => {
+    const isTv = movie.type === 'tv' || movie.media_type === 'tv' || seasons.length > 0;
+    if (isTv && selS) {
+      setLoadingEps(true);
+      getSeasonEpisodes(movie.id, selS).then(res => {
+        setEps(res || []);
+      }).catch(() => { }).finally(() => setLoadingEps(false));
+    }
+  }, [movie.id, selS, seasons.length]);
 
   useEffect(() => {
     document.body.style.overflow = "hidden";
-    // Check list status
-    authFetch(`/mylist/check/${movie.id}`).then(res => setList(res.inList)).catch(() => { });
+    // Check list and like status
+    authFetch(`/mylist/${movie.id}/check`).then(res => setList(res.inList)).catch(() => { });
+    authFetch(`/likes/${movie.id}/check`).then(res => setLiked(res.liked)).catch(() => { });
     return () => { document.body.style.overflow = "" };
   }, [movie.id]);
+
+  const toggleLike = async () => {
+    const prev = liked;
+    setLiked(!prev);
+    if (!prev) showToast('❤️ Saved to Liked!');
+    try {
+      if (prev) {
+        await authFetch(`/likes/${movie.id}`, { method: 'DELETE' });
+      } else {
+        await authFetch('/likes', {
+          method: 'POST',
+          body: JSON.stringify({
+            movie_id: movie.id, movie_title: movie.title, movie_thumbnail: movie.thumbnail,
+            movie_year: movie.year || movie.release_date || '', movie_genre: movie.genre || ''
+          })
+        });
+      }
+    } catch { setLiked(prev); showToast('⚠️ Sign in to like movies'); }
+  };
 
   useEffect(() => {
     apiFetch('/movies/trending').then(ms => setSim(ms.filter(m => m.id !== movie.id).slice(0, 3))).catch(() => { });
   }, [movie.id]);
 
   const toggleList = async () => {
+    const prev = list;
+    setList(!prev);
+    if (!prev) showToast('➕ Added to Your Watchlist.');
     try {
-      if (list) {
+      if (prev) {
         await authFetch(`/mylist/${movie.id}`, { method: 'DELETE' });
-        setList(false);
       } else {
         const body = JSON.stringify({
           movie_id: movie.id, movie_title: movie.title, movie_thumbnail: movie.thumbnail,
@@ -625,15 +754,13 @@ function MovieModal({ movie, onClose, onPlay }) {
         });
         await authFetch('/mylist', { method: 'POST', body });
         await authFetch('/downloads', { method: 'POST', body }).catch(() => { });
-        setList(true);
-        showToast('Add to Your Watchlist.');
-
         const u = getCurrentUser();
         if (u) trackDownload(u, movie);
       }
     } catch (err) {
+      setList(prev);
       console.warn('Login to manage list');
-      alert('Sign in to add to list and download.');
+      showToast('⚠️ Sign in to add to list and download.');
     }
   };
 
@@ -641,13 +768,49 @@ function MovieModal({ movie, onClose, onPlay }) {
     <div className="ov" onClick={onClose}>
       <div className="mbox" onClick={e => e.stopPropagation()}>
         <button className="mcls" onClick={onClose}><X size={18} /></button>
-        <div className="mhi"><img src={movie.backdrop || movie.thumbnail} alt={movie.title} /><div className="mhf" /><div className="mhc">
-          <h2 className="mht">{movie.title}</h2>
-          <div className="mha">
-            <button className="bplay sm" onClick={() => { onPlay(movie); onClose(); }}><Play fill="#000" size={16} /> Play</button>
+        <div className="mhi">
+          {playingTrailer && trailerKey ? (
+            <iframe width="100%" style={{ border: 'none', position: 'absolute', top: 0, left: 0, right: 0, height: 'calc(100% - 80px)', zIndex: 0 }} src={`https://www.youtube.com/embed/${trailerKey}?autoplay=1&controls=1&disablekb=0&showinfo=0&rel=0&modestbranding=1&iv_load_policy=3`} allow="autoplay; encrypted-media" allowFullScreen></iframe>
+          ) : (
+            <img src={movie.backdrop || movie.thumbnail} alt={movie.title} />
+          )}
+          <div className="mhf" style={{ zIndex: 1, pointerEvents: 'none' }} />
+          <div className="mhc" style={{ zIndex: 2, pointerEvents: 'none' }}>
+           <h2 className="mht" style={{ pointerEvents: 'auto', opacity: playingTrailer ? 0 : 1, transition: 'opacity 0.3s' }}>{movie.title}</h2>
+           <div className="mha" style={{ pointerEvents: 'auto' }}>
+             <button className="bplay sm" onClick={() => { onPlay(movie); onClose(); }}><Play fill="#000" size={16} /> Play</button>
+             <button className="bplay sm" style={{ background: 'rgba(109, 109, 110, 0.7)', color: 'white' }} onClick={handlePlayTrailer}>
+               {playingTrailer ? <X size={16} /> : <Film size={16} />} {playingTrailer ? 'Close Trailer' : 'Trailer'}
+             </button>
             <button className={"bic" + (list ? " act" : "")} onClick={toggleList}>{list ? <Check size={16} color="#46d369" /> : <Plus size={16} />}</button>
-            <button className={"bic" + (liked ? " lk" : "")} onClick={() => setLiked(l => !l)}><ThumbsUp size={16} /></button>
-            <button className="bic" onClick={() => { const src = getVideoForMovie(movie); const a = document.createElement('a'); a.href = src.url; a.download = (movie.title || 'movie') + '.mp4'; a.click(); showToast('⬇️ Download started!'); }} title="Download"><Download size={16} /></button>
+            <button className={"bic" + (liked ? " lk" : "")} onClick={toggleLike}><ThumbsUp size={16} fill={liked ? "#e50914" : "none"} /></button>
+            <div style={{ position: 'relative', display: 'flex', gap: 8 }}>
+              <button className="bic" onClick={() => { 
+                const u = getCurrentUser();
+                if (u) {
+                  showToast('💾 Saving to Downloads...');
+                  const body = JSON.stringify({
+                    movie_id: movie.id, movie_title: movie.title, movie_thumbnail: movie.thumbnail,
+                    movie_year: movie.year || movie.release_date || '', movie_rating: movie.rating || ''
+                  });
+                  authFetch('/downloads', { method: 'POST', body }).then(() => {
+                    showToast('💾 Saved to Internal Downloads!');
+                    trackDownload(u, movie);
+                  }).catch(() => showToast('❌ Error saving.'));
+                } else {
+                  alert('Please sign in to save offline.');
+                }
+              }} title="Save to Site"><Save size={16} /></button>
+              
+              <button className="bic" onClick={() => { 
+                const src = getVideoForMovie(movie); 
+                const a = document.createElement('a'); 
+                a.href = src.url; 
+                a.download = (movie.title || 'movie') + '.mp4'; 
+                a.click(); 
+                showToast('🚀 Export to Device started!'); 
+              }} title="Export to Device"><Download size={16} /></button>
+            </div>
             <button className="bic" onClick={() => { navigator.clipboard.writeText(window.location.href + '?movie=' + movie.id).then(() => showToast('🔗 Link copied!')); }} title="Share"><Share2 size={14} /></button>
           </div>
         </div></div>
@@ -658,6 +821,71 @@ function MovieModal({ movie, onClose, onPlay }) {
               <span className="pl r">{movie.maturity}</span><span className="pl">{movie.episodes}</span><span className="pl b">HD</span>
             </div>
             <p className="mdes">{movie.desc}</p>
+
+            {/* EPISODES SECTION */}
+            {movie.type === 'tv' && (
+              <div style={{ marginTop: 24 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+                  <h4 style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 18, fontWeight: 700, margin: 0 }}>Episodes</h4>
+                  {seasons.length > 1 && (
+                    <div style={{ position: 'relative' }}>
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); setShowS(s => !s); }}
+                        style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', color: '#fff', padding: '6px 16px', borderRadius: 4, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}
+                      >
+                        {seasons.find(s => s.season_number === selS)?.name || `Season ${selS}`} <ChevronDown size={14} />
+                      </button>
+                      {showS && (
+                        <div style={{ position: 'absolute', top: 'calc(100% + 4px)', right: 0, background: '#181818', border: '1px solid #333', borderRadius: 4, zIndex: 10, width: 140, boxShadow: '0 8px 16px rgba(0,0,0,0.5)', overflow: 'hidden' }}>
+                          {seasons.map(s => (
+                            <div key={s.id} 
+                              onClick={() => { setSelS(s.season_number); setShowS(false); }}
+                              style={{ padding: '10px 16px', fontSize: 13, cursor: 'pointer', background: s.season_number === selS ? '#333' : 'transparent', color: s.season_number === selS ? '#fff' : '#b3b3b3' }}
+                              onMouseEnter={e => e.currentTarget.style.background = '#333'}
+                              onMouseLeave={e => { if (s.season_number !== selS) e.currentTarget.style.background = 'transparent'; }}
+                            >
+                              {s.name}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {loadingEps ? (
+                  <div style={{ padding: '20px 0', textAlign: 'center', opacity: 0.5 }}>Loading episodes...</div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                    {eps.map((e, idx) => (
+                      <div key={e.id} 
+                        onClick={() => { onPlay({...movie, currentEpisode: e, seasonNum: selS}); onClose(); }}
+                        className="ep-row"
+                        style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '16px 12px', borderRadius: 4, cursor: 'pointer', transition: 'background 0.2s', borderBottom: '1px solid rgba(255,255,255,0.05)' }}
+                        onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
+                        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                      >
+                        <span style={{ fontSize: 18, color: 'rgba(255,255,255,0.3)', width: 24, textAlign: 'center' }}>{idx + 1}</span>
+                        <div style={{ position: 'relative', width: 130, height: 74, flexShrink: 0, borderRadius: 4, overflow: 'hidden' }}>
+                          <img src={e.still || movie.thumbnail} alt={e.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.2)', opacity: 0 }} 
+                            onMouseEnter={e => e.currentTarget.style.opacity = 1} onMouseLeave={e => e.currentTarget.style.opacity = 0}>
+                            <Play fill="#fff" size={24} />
+                          </div>
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                            <h5 style={{ margin: 0, fontSize: 14, fontWeight: 700 }}>{e.name}</h5>
+                            <span style={{ fontSize: 13, opacity: 0.6 }}>{e.runtime}</span>
+                          </div>
+                          <p style={{ margin: 0, fontSize: 12, color: 'rgba(255,255,255,0.5)', lineHeight: 1.4, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{e.overview}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
           <div className="mbr">
             {movie.cast && <p><span className="lbl">Cast:</span> {movie.cast}</p>}
@@ -681,24 +909,27 @@ function ProfileModal({ onClose }) {
   const [activity, setActivity] = useState([]);
   const [watchlist, setWatchlist] = useState([]);
   const [likes, setLikes] = useState([]);
+  const [downloads, setDownloads] = useState([]);
   const [loading, setLoading] = useState(true);
   const user = getCurrentUser() || { name: 'User', email: 'user@rimuru.demo' };
 
   const loadData = async () => {
     setLoading(true);
-    const tok = localStorage.getItem('netflix_token') || '';
-    const headers = { Authorization: `Bearer ${tok}` };
     try {
-      const [act, list, lks] = await Promise.all([
-        fetch('/api/profile/activity', { headers }).then(r => r.json()),
-        fetch('/api/mylist', { headers }).then(r => r.json()),
-        fetch('/api/likes', { headers }).then(r => r.json())
+      const [act, list, lks, dls] = await Promise.all([
+        authFetch('/profile/activity'),
+        authFetch('/mylist'),
+        authFetch('/likes'),
+        authFetch('/downloads')
       ]);
       setActivity(Array.isArray(act) ? act : []);
       setWatchlist(Array.isArray(list) ? list : []);
       setLikes(Array.isArray(lks) ? lks : []);
-    } catch (e) { console.error('Profile load error', e); }
-    finally { setLoading(false); }
+      setDownloads(Array.isArray(dls) ? dls : []);
+    } catch (e) { 
+      console.error('Profile load error', e); 
+      showToast('Error loading profile data');
+    } finally { setLoading(false); }
   };
 
   useEffect(() => { loadData(); }, []);
@@ -711,9 +942,11 @@ function ProfileModal({ onClose }) {
     items.forEach(item => {
       const g = (item.movie_genre || '').toLowerCase();
       const title = (item.movie_title || '').toLowerCase();
+      
+      // Better classification
       if (g.includes('anime') || title.includes('anime')) groups.Anime.push(item);
       else if (g.includes('cartoon') || title.includes('cartoon')) groups.Cartoon.push(item);
-      else if (g.includes('drama')) groups.Drama.push(item);
+      else if (g.includes('drama') || g.includes('tv') || g.includes('series')) groups.Drama.push(item);
       else groups.Movies.push(item);
     });
     return groups;
@@ -728,6 +961,8 @@ function ProfileModal({ onClose }) {
       transition: 'all 0.22s', display: 'flex', alignItems: 'center', gap: 6,
     }}>{icon} {label}</button>
   );
+
+  const downloadBtn = tabBtn('downloads', 'Downloads', <Download size={15} />);
 
   const renderGrid = (items) => {
     const groups = groupByCategory(items);
@@ -801,11 +1036,13 @@ function ProfileModal({ onClose }) {
           ))}
         </div>
 
-        <div style={{ display: 'flex', borderBottom: '1px solid rgba(255,255,255,0.08)', marginBottom: 32 }}>
-          {tabBtn('activity', 'Activity', '🕒')}
-          {tabBtn('watchlist', 'Watchlist', '🔖')}
-          {tabBtn('likes', 'Liked', '❤️')}
-          {tabBtn('edit', 'Settings', '⚙️')}
+        <div style={{ display: 'flex', borderBottom: '1px solid rgba(255,255,255,0.1)', marginBottom: 30 }}>
+          {tabBtn('activity', 'Recent Activity', <Activity size={15} />)}
+          {tabBtn('watchlist', 'My List', <Plus size={15} />)}
+          {tabBtn('likes', 'Liked', <ThumbsUp size={15} />)}
+          {downloadBtn}
+          <div style={{ flex: 1 }} />
+          {tabBtn('edit', 'Edit Profile', <Settings size={15} />)}
         </div>
 
         {loading ? (
@@ -814,26 +1051,10 @@ function ProfileModal({ onClose }) {
           </div>
         ) : (
           <>
-            {tab === 'activity' && (
-              <div>
-                <h3 style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 24, marginBottom: 20 }}>Watch History</h3>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                  {activity.map(item => (
-                    <div key={item.id} style={{ display: 'flex', gap: 16, background: 'rgba(255,255,255,0.03)', padding: 12, borderRadius: 12, alignItems: 'center' }}>
-                      <img src={item.movie_thumbnail} style={{ width: 100, height: 60, objectFit: 'cover', borderRadius: 6 }} alt="" />
-                      <div style={{ flex: 1 }}>
-                        <p style={{ margin: 0, fontWeight: 700, fontSize: 14 }}>{item.movie_title}</p>
-                        <p style={{ margin: '4px 0 0', fontSize: 12, opacity: 0.4 }}>{item.relTime}</p>
-                      </div>
-                      <Play size={16} style={{ opacity: 0.5 }} />
-                    </div>
-                  ))}
-                  {activity.length === 0 && <p style={{ opacity: 0.3, textAlign: 'center', padding: 40 }}>No history yet</p>}
-                </div>
-              </div>
-            )}
+            {tab === 'activity' && renderGrid(activity)}
             {tab === 'watchlist' && renderGrid(watchlist)}
             {tab === 'likes' && renderGrid(likes)}
+            {tab === 'downloads' && renderGrid(downloads)}
             {tab === 'edit' && (
               <div style={{ maxWidth: 400 }}>
                 <label style={{ display: 'block', fontSize: 12, opacity: 0.4, marginBottom: 8 }}>Display Name</label>
@@ -1056,10 +1277,22 @@ export default function HomePage({ onLogout }) {
     ? (rows[activeGenre] || [])
     : cat !== "Home"
       ? (rows[km[cat]] || [])
-      : rows.trending;
+      : (rows.trending && rows.trending.length > 0)
+        ? rows.trending
+        : (Object.values(rows).find(list => Array.isArray(list) && list.length > 0) || []);
+
   const heroMovie = heroSource[heroIdx % Math.max(heroSource.length, 1)] || null;
   const getRows = () => {
-    if (activeGenre) { const g = GENRES.find(x => x.key === activeGenre); return [{ title: g.emoji + " " + g.label, movies: rows[activeGenre] || [] }]; }
+    if (activeGenre) { 
+      const g = GENRES.find(x => x.key === activeGenre); 
+      const allMovies = rows[activeGenre] || [];
+      return [
+        { title: "🆕 Latest " + g.label, movies: allMovies.slice(0, 20) },
+        { title: "⭐ Highly Rated", movies: [...allMovies].sort((a,b) => parseFloat(b.rating) - parseFloat(a.rating)).slice(0, 20) },
+        { title: "✨ More to Explore", movies: [...allMovies].slice(20, 60).sort(() => Math.random() - .5) },
+      ]; 
+    }
+    
     if (cat === "Home") return [
       { title: "🔥 Trending Now", movies: rows.trending, rank: true },
       { title: "🎬 Hollywood", movies: rows.hollywood },
@@ -1071,7 +1304,15 @@ export default function HomePage({ onLogout }) {
       { title: "⛩️ J-Dramas", movies: rows.jdrama },
       { title: "✨ Top Picks", movies: rows.picks },
     ];
-    return [{ title: cat, movies: rows[km[cat]] || [] }];
+
+    const categoryLabel = cat;
+    const categoryKey = km[cat];
+    const categoryMovies = rows[categoryKey] || [];
+    return [
+      { title: "🆕 Latest " + categoryLabel, movies: categoryMovies.slice(0, 20) },
+      { title: "⭐ Top Rated in " + categoryLabel, movies: [...categoryMovies].sort((a,b) => parseFloat(b.rating) - parseFloat(a.rating)).slice(0, 20) },
+      { title: "🎞️ Browse All", movies: [...categoryMovies].slice(20, 100) },
+    ];
   };
 
   return (
@@ -1079,7 +1320,7 @@ export default function HomePage({ onLogout }) {
       <style>{CSS}</style>
       <div className="root">
         <Aurora /><Particles />
-        <Navbar scrolled={scrolled} category={cat} setCategory={handleCat} onSearch={handleSearch} setActiveModal={setSettingsModal} onLogout={onLogout} />
+        <Navbar scrolled={scrolled} category={cat} setCategory={handleCat} onSearch={handleSearch} setActiveModal={setSettingsModal} onLogout={onLogout} trending={rows.trending || []} anime={rows.anime || []} onMovieSelect={setModal} />
         {query.trim() ? (
           <div style={{ paddingTop: 100, position: "relative", zIndex: 2 }}>
             {searching
@@ -1398,3 +1639,4 @@ body{background:var(--bg);color:#fff;font-family:'DM Sans',sans-serif;overflow-x
 .footer-bottom{text-align:center;opacity:.25;font-size:11px;padding-top:24px;border-top:1px solid rgba(255,255,255,.06);}
 .footer-logo{font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:2px;margin-bottom:6px;color:var(--red);}
 `;
+
