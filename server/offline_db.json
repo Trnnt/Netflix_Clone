@@ -19,6 +19,16 @@
       "movie_rating": "9.1",
       "movie_genre": "",
       "added_at": "2026-06-27T09:54:31.663Z"
+    },
+    {
+      "user_id": "offline_user_1782464168331",
+      "movie_id": "980431",
+      "movie_title": "Avatar Aang: The Last Airbender",
+      "movie_thumbnail": "https://image.tmdb.org/t/p/w500/sS3zGYFPcfM5pArVNWl6qLyaSmU.jpg",
+      "movie_year": "2026",
+      "movie_rating": "N/A",
+      "movie_genre": "",
+      "added_at": "2026-06-30T17:19:02.284Z"
     }
   ],
   "downloads": [
@@ -39,6 +49,15 @@
       "movie_year": "2026",
       "movie_rating": "9.1",
       "downloaded_at": "2026-06-27T09:54:32.165Z"
+    },
+    {
+      "user_id": "offline_user_1782464168331",
+      "movie_id": "980431",
+      "movie_title": "Avatar Aang: The Last Airbender",
+      "movie_thumbnail": "https://image.tmdb.org/t/p/w500/sS3zGYFPcfM5pArVNWl6qLyaSmU.jpg",
+      "movie_year": "2026",
+      "movie_rating": "N/A",
+      "downloaded_at": "2026-06-30T17:19:03.074Z"
     }
   ],
   "watchHistory": [
@@ -601,6 +620,66 @@
       "season": null,
       "episode": null,
       "createdAt": "2026-06-30T16:12:11.255Z"
+    },
+    {
+      "user_id": "offline_user_1782464168331",
+      "movie_id": "980431",
+      "movie_title": "Avatar Aang: The Last Airbender",
+      "movie_thumbnail": "https://image.tmdb.org/t/p/w500/sS3zGYFPcfM5pArVNWl6qLyaSmU.jpg",
+      "duration_min": 1,
+      "season": null,
+      "episode": null,
+      "createdAt": "2026-06-30T19:06:58.921Z"
+    },
+    {
+      "user_id": "offline_user_1782464168331",
+      "movie_id": "980431",
+      "movie_title": "Avatar Aang: The Last Airbender",
+      "movie_thumbnail": "https://image.tmdb.org/t/p/w500/sS3zGYFPcfM5pArVNWl6qLyaSmU.jpg",
+      "duration_min": 1,
+      "season": null,
+      "episode": null,
+      "createdAt": "2026-06-30T19:06:58.933Z"
+    },
+    {
+      "user_id": "offline_user_1782464168331",
+      "movie_id": "980431",
+      "movie_title": "Avatar Aang: The Last Airbender",
+      "movie_thumbnail": "https://image.tmdb.org/t/p/w500/sS3zGYFPcfM5pArVNWl6qLyaSmU.jpg",
+      "duration_min": 1,
+      "season": null,
+      "episode": null,
+      "createdAt": "2026-06-30T19:08:43.520Z"
+    },
+    {
+      "user_id": "offline_user_1782464168331",
+      "movie_id": "980431",
+      "movie_title": "Avatar Aang: The Last Airbender",
+      "movie_thumbnail": "https://image.tmdb.org/t/p/w500/sS3zGYFPcfM5pArVNWl6qLyaSmU.jpg",
+      "duration_min": 1,
+      "season": null,
+      "episode": null,
+      "createdAt": "2026-06-30T19:08:43.536Z"
+    },
+    {
+      "user_id": "offline_user_1782464168331",
+      "movie_id": "271607",
+      "movie_title": "The Fragrant Flower Blooms with Dignity",
+      "movie_thumbnail": "https://image.tmdb.org/t/p/w500/dl3pdT1NZiqRM4aDBwsD2TtO8x9.jpg",
+      "duration_min": 1,
+      "season": null,
+      "episode": null,
+      "createdAt": "2026-06-30T19:09:54.457Z"
+    },
+    {
+      "user_id": "offline_user_1782464168331",
+      "movie_id": "271607",
+      "movie_title": "The Fragrant Flower Blooms with Dignity",
+      "movie_thumbnail": "https://image.tmdb.org/t/p/w500/dl3pdT1NZiqRM4aDBwsD2TtO8x9.jpg",
+      "duration_min": 1,
+      "season": null,
+      "episode": null,
+      "createdAt": "2026-06-30T19:09:54.467Z"
     }
   ],
   "likes": [
@@ -612,6 +691,15 @@
       "movie_year": "2026",
       "movie_genre": "Movie",
       "added_at": "2026-06-27T09:45:26.139Z"
+    },
+    {
+      "user_id": "offline_user_1782464168331",
+      "movie_id": "980431",
+      "movie_title": "Avatar Aang: The Last Airbender",
+      "movie_thumbnail": "https://image.tmdb.org/t/p/w500/sS3zGYFPcfM5pArVNWl6qLyaSmU.jpg",
+      "movie_year": "2026",
+      "movie_genre": "Movie",
+      "added_at": "2026-06-30T17:19:06.067Z"
     }
   ]
 }
