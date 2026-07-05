@@ -8,20 +8,32 @@ export const toastEvent = new EventTarget();
 export const showToast = (msg) => toastEvent.dispatchEvent(new CustomEvent('toast', { detail: msg }));
 
 const API = 'http://localhost:5000/api';
-async function apiFetch(path) {
-  const res = await fetch(API + path);
-  if (!res.ok) throw new Error('API ' + path);
-  return res.json();
+
+// Production-ready fetch with Retry + Exponential Backoff
+async function apiFetch(path, options = {}, retries = 3, backoff = 300) {
+  try {
+    const res = await fetch(API + path, options);
+    if (!res.ok) throw new Error(`API ${path} responded with status ${res.status}`);
+    return await res.json();
+  } catch (err) {
+    if (retries > 0 && err.name !== 'AbortError') {
+      await new Promise(res => setTimeout(res, backoff));
+      return apiFetch(path, options, retries - 1, backoff * 2);
+    }
+    throw err;
+  }
 }
+
 async function authFetch(path, opts = {}) {
   const token = localStorage.getItem('netflix_token') || '';
-  const res = await fetch(API + path, {
+  return apiFetch(path, {
     ...opts,
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, ...(opts.headers || {}) },
   });
-  if (!res.ok) throw new Error(`API ${path} ${res.status}`);
-  return res.json();
 }
+
+// Memory/Session Cache Layer
+const cache = new Map();
 
 function useMovieData() {
   const empty = { trending: [], hollywood: [], anime: [], kdrama: [], cdrama: [], jdrama: [], wollywood: [], cartoon: [], picks: [] };
@@ -30,18 +42,48 @@ function useMovieData() {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    setLoading(true);
-    setError(null);
-    const genres = ['hollywood', 'anime', 'kdrama', 'cdrama', 'jdrama', 'wollywood', 'cartoon'];
-    const safeFetch = path => apiFetch(path).catch(e => { console.warn(path, 'Failed', e); return []; });
+    const controller = new AbortController();
+    const { signal } = controller;
 
-    Promise.all([safeFetch('/movies/trending'), ...genres.map(g => safeFetch('/movies/genre/' + g))])
-      .then(([trending, ...rest]) => {
+    const fetchData = async () => {
+      setLoading(true);
+      setError(null);
+      
+      const genres = ['hollywood', 'anime', 'kdrama', 'cdrama', 'jdrama', 'wollywood', 'cartoon'];
+      const cachedData = sessionStorage.getItem('rimuru_home_cache');
+      
+      if (cachedData) {
+        setRows(JSON.parse(cachedData));
+        setLoading(false);
+        // We do a background revalidate (Stale-While-Revalidate pattern)
+      }
+
+      const safeFetch = async (path) => {
+        if (cache.has(path)) return cache.get(path);
+        try {
+          const data = await apiFetch(path, { signal });
+          cache.set(path, data);
+          return data;
+        } catch (e) {
+          if (e.name !== 'AbortError') console.warn(path, 'Failed', e);
+          return [];
+        }
+      };
+
+      try {
+        const [trending, ...rest] = await Promise.all([
+          safeFetch('/movies/trending'),
+          ...genres.map(g => safeFetch('/movies/genre/' + g))
+        ]);
+
+        if (signal.aborted) return;
+
         const trendingList = Array.isArray(trending) ? trending : [];
         const r = {
           trending: trendingList,
           picks: [...trendingList].sort(() => Math.random() - .5)
         };
+        
         genres.forEach((g, i) => {
           r[g] = Array.isArray(rest[i]) ? rest[i] : [];
         });
@@ -51,16 +93,27 @@ function useMovieData() {
           setError("Backend Connection Failed: TMDB proxy returned no data. Your TMDB token might be invalid or rate-limited.");
         } else {
           setError(null);
+          sessionStorage.setItem('rimuru_home_cache', JSON.stringify(r));
         }
 
         setRows(r);
-      })
-      .catch((e) => {
-        console.warn('Backend offline or API error', e);
-        setError("Backend Connection Failed: " + (e.message || "Unknown Error"));
-      })
-      .finally(() => setLoading(false));
+      } catch (e) {
+        if (!signal.aborted) {
+          console.warn('Backend offline or API error', e);
+          setError("Backend Connection Failed: " + (e.message || "Unknown Error"));
+        }
+      } finally {
+        if (!signal.aborted) setLoading(false);
+      }
+    };
+
+    fetchData();
+    
+    return () => {
+      controller.abort(); // Cleanup & prevent memory leaks if component unmounts
+    };
   }, []);
+
   return { rows, loading, error };
 }
 
@@ -371,7 +424,7 @@ function Card({ movie, onOpen, onPlay, rank, pos }) {
       onClick={() => onOpen(movie)}>
       {rank && <span className="rnk">{rank}</span>}
       <div className="cib">
-        <img src={movie.thumbnail || "https://upload.wikimedia.org/wikipedia/commons/0/0b/Netflix-avatar.png"} alt={movie.title} className="cimg" onError={e => { e.target.src = "https://upload.wikimedia.org/wikipedia/commons/0/0b/Netflix-avatar.png"; }} style={{ objectFit: 'cover' }} />
+        <img src={movie.thumbnail || "https://upload.wikimedia.org/wikipedia/commons/0/0b/Netflix-avatar.png"} alt={movie.title} className="cimg" loading="lazy" onError={e => { e.target.src = "https://upload.wikimedia.org/wikipedia/commons/0/0b/Netflix-avatar.png"; }} style={{ objectFit: 'cover' }} />
         <div className="cgr" />
         <div className="card-play-ov"><Play size={26} fill="#fff" color="#fff" /></div>
         <div className="card-hd-badge">HD</div>
@@ -466,22 +519,36 @@ function VideoPlayer({ movie, onClose }) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [iframeLoading, setIframeLoading] = useState(true);
   const [iframeKey, setIframeKey] = useState(0);
+  const [audioMode, setAudioMode] = useState('sub'); // 'sub' or 'dub'
+  const [ccEnabled, setCcEnabled] = useState(true);
+  const [selectedLang, setSelectedLang] = useState('en');
   const loadTimerRef = useRef(null);
 
   const servers = isTV ? TV_SERVERS : MOVIE_SERVERS;
   const srv = servers[serverIdx] || servers[0];
-  const embedUrl = isTV ? srv.getUrl(movie.id, selSeason, selEp) : srv.getUrl(movie.id);
+  const baseEmbedUrl = isTV ? srv.getUrl(movie.id, selSeason, selEp) : srv.getUrl(movie.id);
+  
+  // Store the active URL in state so we only update it on major changes, not UI toggles
+  const [activeEmbedUrl, setActiveEmbedUrl] = useState(baseEmbedUrl);
 
   useEffect(() => { document.body.style.overflow = 'hidden'; return () => { document.body.style.overflow = ''; }; }, []);
   useEffect(() => { if (movie) { const u = getCurrentUser(); if (u) trackWatch(u, movie); } }, [movie]);
 
   useEffect(() => {
+    // Generate the URL with current language states and trigger a reload.
+    // Always enforce English subtitles, regardless of the audio mode or selected dub language.
+    const subLangStr = 'en';
+    
+    // Aggressively append every known subtitle flag across all providers to force English (especially for Anime)
+    const newUrl = `${baseEmbedUrl}${baseEmbedUrl.includes('?') ? '&' : '?'}audio=${audioMode}&cc=${ccEnabled ? '1' : '0'}&cc_lang=${subLangStr}&sub_lang=${subLangStr}&ds_lang=${subLangStr}&lang=${selectedLang}&sub.info=${subLangStr}&sub=${subLangStr === 'en' ? 'english' : subLangStr}`;
+    
+    setActiveEmbedUrl(newUrl);
     setIframeLoading(true);
     setIframeKey(k => k + 1);
     clearTimeout(loadTimerRef.current);
     loadTimerRef.current = setTimeout(() => setIframeLoading(false), 20000);
     return () => clearTimeout(loadTimerRef.current);
-  }, [serverIdx, selSeason, selEp]);
+  }, [serverIdx, selSeason, selEp, baseEmbedUrl, audioMode, ccEnabled, selectedLang]);
 
   useEffect(() => {
     if (!isTV) return;
@@ -556,7 +623,7 @@ function VideoPlayer({ movie, onClose }) {
           )}
 
           {!iframeLoading && serverIdx < servers.length - 1 && (
-            <div style={{ position:'absolute', bottom:16, right:16, zIndex:20 }}>
+            <div style={{ position:'absolute', bottom:75, right:16, zIndex:20 }}>
               <button onClick={nextServer} style={{ background:'rgba(10,10,10,.9)', backdropFilter:'blur(10px)', border:'1px solid rgba(255,165,0,.3)', color:'#ffa500', padding:'7px 16px', borderRadius:20, cursor:'pointer', fontSize:11, fontWeight:700 }}>
                 ⚡ Not Working? Switch Server
               </button>
@@ -565,12 +632,62 @@ function VideoPlayer({ movie, onClose }) {
 
           <iframe
             key={iframeKey}
-            src={embedUrl}
+            src={activeEmbedUrl}
             style={{ flex:1, width:'100%', border:'none', background:'#000', display:'block' }}
             allowFullScreen
             allow="autoplay; fullscreen; picture-in-picture; encrypted-media"
             onLoad={() => { setIframeLoading(false); clearTimeout(loadTimerRef.current); }}
           />
+
+          {/* Player Controls Bar (Sub/Dub/CC/Lang) */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 20px', background: '#0a0a0a', borderTop: '1px solid #1a1a1a', flexShrink: 0 }}>
+            <div style={{ display: 'flex', gap: 20, alignItems: 'center' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#aaa', fontSize: 13, cursor: 'pointer', userSelect: 'none' }}>
+                <input type="checkbox" defaultChecked style={{ accentColor: '#e50914', cursor: 'pointer' }} /> Auto Play
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#aaa', fontSize: 13, cursor: 'pointer', userSelect: 'none' }}>
+                <input type="checkbox" defaultChecked style={{ accentColor: '#e50914', cursor: 'pointer' }} /> Auto Next
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#e50914', fontSize: 13, cursor: 'pointer', fontWeight: 600, userSelect: 'none' }}>
+                <input type="checkbox" defaultChecked style={{ accentColor: '#e50914', cursor: 'pointer' }} /> Auto Skip
+              </label>
+            </div>
+            
+            <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+              
+              {audioMode === 'dub' && (
+                <select 
+                  value={selectedLang}
+                  onChange={(e) => { setSelectedLang(e.target.value); setIframeLoading(true); }}
+                  style={{ background: '#111', color: '#fff', border: '1px solid #333', padding: '6px 10px', borderRadius: 6, outline: 'none', fontSize: 12, cursor: 'pointer' }}
+                >
+                  <option value="en">🇺🇸 English</option>
+                  <option value="es">🇪🇸 Spanish</option>
+                  <option value="fr">🇫🇷 French</option>
+                  <option value="de">🇩🇪 German</option>
+                  <option value="ja">🇯🇵 Japanese</option>
+                  <option value="hi">🇮🇳 Hindi</option>
+                  <option value="ar">🇸🇦 Arabic</option>
+                </select>
+              )}
+
+              <div style={{ display: 'flex', background: '#111', borderRadius: 6, overflow: 'hidden', border: '1px solid #222' }}>
+                <button onClick={() => setAudioMode('sub')}
+                  style={{ background: audioMode === 'sub' ? '#e50914' : 'transparent', border: 'none', color: audioMode === 'sub' ? '#fff' : '#888', padding: '7px 16px', cursor: 'pointer', fontSize: 12, fontWeight: 700, transition: 'all .2s' }}>
+                  ORIGINAL
+                </button>
+                <button onClick={() => setAudioMode('dub')}
+                  style={{ background: audioMode === 'dub' ? '#e50914' : 'transparent', border: 'none', color: audioMode === 'dub' ? '#fff' : '#888', padding: '7px 16px', cursor: 'pointer', fontSize: 12, fontWeight: 700, transition: 'all .2s' }}>
+                  🎤 DUB
+                </button>
+              </div>
+              <button onClick={() => setCcEnabled(!ccEnabled)}
+                style={{ background: ccEnabled ? '#fff' : '#222', border: 'none', color: ccEnabled ? '#000' : '#888', padding: '7px 14px', borderRadius: 6, cursor: 'pointer', fontSize: 12, fontWeight: 700, transition: 'all .2s', display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ border: ccEnabled ? '1px solid #000' : '1px solid #888', padding: '0px 3px', borderRadius: 3, fontSize: 10 }}>CC</span>
+                {ccEnabled ? 'ON' : 'OFF'}
+              </button>
+            </div>
+          </div>
         </div>
 
         {/* EPISODE SIDEBAR */}

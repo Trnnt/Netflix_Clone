@@ -181,9 +181,11 @@ io.on('connection', (socket) => {
 // ══════════════════════════════════════════════════════════════════════════════
 // ── TMDB SETUP ───────────────────────────────────────────────────────────────
 // ══════════════════════════════════════════════════════════════════════════════
+const TMDB_BASE_URL = process.env.TMDB_PROXY_URL || 'https://api.themoviedb.org/3';
+
 const TMDB = axios.create({
-  baseURL: 'https://api.themoviedb.org/3',
-  headers: { Authorization: `Bearer ${process.env.TMDB_BEARER_TOKEN}`, Accept: 'application/json' },
+  baseURL: TMDB_BASE_URL,
+  headers: { Accept: 'application/json' },
 });
 
 const mapMovie = (m, genre = 'Movie') => ({
@@ -557,15 +559,15 @@ async function warmUpCache() {
         try {
           let url, params;
           if (g.isTrending) {
-            url = `https://api.themoviedb.org/3/trending/all/week?page=${p}`;
+            url = `${TMDB_BASE_URL}/trending/all/week?page=${p}`;
           } else {
-            url = g.type === 'tv' ? 'https://api.themoviedb.org/3/discover/tv' : 'https://api.themoviedb.org/3/discover/movie';
+            url = g.type === 'tv' ? `${TMDB_BASE_URL}/discover/tv` : `${TMDB_BASE_URL}/discover/movie`;
             params = new URLSearchParams({ sort_by: 'popularity.desc', 'vote_count.gte': 100, page: p, ...g });
             params.delete('name'); params.delete('type'); params.delete('pages');
           }
 
           const res = await fetch(params ? `${url}?${params}` : url, {
-            headers: { Authorization: `Bearer ${process.env.TMDB_BEARER_TOKEN}`, Accept: 'application/json' }
+            headers: { Accept: 'application/json' }
           });
 
           if (!res.ok) {
@@ -618,8 +620,8 @@ async function warmUpCache() {
       const shows = ['Ben 10', 'Pokemon', 'Doraemon', 'Ninja Hattori'];
       for (let i = shows.length - 1; i >= 0; i--) { // Reverse loop to maintain order when unshifting
         try {
-          const res = await fetch(`https://api.themoviedb.org/3/search/tv?query=${encodeURIComponent(shows[i])}&page=1`, {
-            headers: { Authorization: `Bearer ${process.env.TMDB_BEARER_TOKEN}`, Accept: 'application/json' }
+          const res = await fetch(`${TMDB_BASE_URL}/search/tv?query=${encodeURIComponent(shows[i])}&page=1`, {
+            headers: { Accept: 'application/json' }
           });
           const data = await res.json();
           if (data.results && data.results.length > 0) {
@@ -903,9 +905,9 @@ app.get('/api/likes/:movieId/check', authMiddleware, async (req, res) => {
 // ══════════════════════════════════════════════════════════════════════════════
 app.post('/api/ai/chat', async (req, res) => {
   try {
-    const { messages = [], message, userName = 'Guest' } = req.body;
+    const { messages = [], message, userName = 'Guest', apiKey } = req.body;
     if (!message) return res.status(400).json({ error: 'message required' });
-    const result = await chatWithAI(movieCache, messages, message, userName);
+    const result = await chatWithAI(movieCache, messages, message, userName, apiKey);
     res.json(result);
   } catch (err) {
     console.error('[AI Chat Error]', err.message);
@@ -957,8 +959,8 @@ const start = async () => {
        server.listen(PORT, () => {
          console.log(`🚀 Rimuru Server running on http://localhost:${PORT}`);
        });
+       warmupPromise = warmUpCache();
     }
-    warmupPromise = warmUpCache();
   } catch (err) {
     console.error('CRITICAL: Failed to start server:', err.message);
   }
@@ -972,7 +974,4 @@ if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
   connectDB().catch(console.error);
 }
 
-// Export for Vercel / Serverless
 export default app;
-
-

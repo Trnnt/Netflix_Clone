@@ -8,6 +8,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "firebase": "^12.15.0",
     "lucide-react": "^0.576.0",
     "react": "latest",
     "react-dom": "latest",

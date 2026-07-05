@@ -4,14 +4,15 @@ import { X, Mic, MicOff, Trash2, Copy, Check, ChevronDown, Sparkles, RefreshCw }
 // Use absolute URL for reliable backend connectivity
 const API_BASE = 'http://localhost:5000/api';
 
-async function sendAIMessage(messages, message, userName) {
+async function sendAIMessage(messages, message, userName, apiKey) {
   const res = await fetch(`${API_BASE}/ai/chat`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ 
       message: message, 
       messages: messages.slice(-10), // Only send last 10 messages for context
-      userName: userName 
+      userName: userName,
+      apiKey: apiKey
     }),
   });
   if (!res.ok) {
@@ -111,6 +112,8 @@ export default function AiChat({ onMovieSelect, userName }) {
 
   const [open, setOpen]               = useState(false);
   const [minimized, setMinimized]     = useState(false);
+  const [userApiKey, setUserApiKey]   = useState(localStorage.getItem('GROQ_API_KEY') || '');
+  const [apiKeyInput, setApiKeyInput] = useState('');
   const [messages, setMessages]       = useState([{
     role: 'assistant',
     content: "Hey there! I'm your AI movie assistant. Tell me your mood, favourite genre, or just ask — I'll find the perfect watch for you! 🎬",
@@ -211,6 +214,13 @@ export default function AiChat({ onMovieSelect, userName }) {
     setSuggestedMovies([]);
   };
 
+  const saveApiKey = () => {
+    if (apiKeyInput.trim()) {
+      localStorage.setItem('GROQ_API_KEY', apiKeyInput.trim());
+      setUserApiKey(apiKeyInput.trim());
+    }
+  };
+
   const [isSyncing, setIsSyncing] = useState(false);
 
   const send = useCallback(async (overrideMsg = null) => {
@@ -233,7 +243,7 @@ export default function AiChat({ onMovieSelect, userName }) {
         role: m.role,
         content: m.content,
       }));
-      const { reply, suggestedMovies: movies } = await sendAIMessage(apiHistory, fullMsg, userName);
+      const { reply, suggestedMovies: movies } = await sendAIMessage(apiHistory, fullMsg, userName, userApiKey);
       
       setMessages(prev => [...prev, { role: 'assistant', content: reply, timestamp: new Date() }]);
       
@@ -557,74 +567,102 @@ export default function AiChat({ onMovieSelect, userName }) {
               </div>
             )}
 
-            {/* INPUT */}
+            {/* INPUT AREA OR API KEY PROMPT */}
             <div style={{
               padding: '14px 20px 20px', borderTop: '1px solid rgba(255,255,255,0.07)',
               background: 'rgba(0,0,0,0.2)', flexShrink: 0,
             }}>
-              {activeMood && (
-                <div style={{ marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>Mood:</span>
-                  <span style={{
-                    fontSize: 11, padding: '2px 10px', borderRadius: 10,
-                    background: `${MOODS.find(m => m.label === activeMood)?.color}20`,
-                    color: MOODS.find(m => m.label === activeMood)?.color,
-                    border: `1px solid ${MOODS.find(m => m.label === activeMood)?.color}40`,
-                  }}>
-                    {MOODS.find(m => m.label === activeMood)?.emoji} {activeMood}
-                  </span>
+              {!userApiKey ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <p style={{ margin: 0, fontSize: 13, color: '#f6c90e', display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <Sparkles size={14} /> Please enter your Groq API Key to start chatting:
+                  </p>
+                  <div style={{ display: 'flex', gap: 10 }}>
+                    <input
+                      type="password"
+                      value={apiKeyInput}
+                      onChange={(e) => setApiKeyInput(e.target.value)}
+                      placeholder="gsk_..."
+                      style={{
+                        flex: 1, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)',
+                        borderRadius: 14, padding: '10px 14px', color: '#fff', fontSize: 13.5, outline: 'none'
+                      }}
+                    />
+                    <button onClick={saveApiKey} style={{
+                      padding: '0 16px', borderRadius: 12, background: 'linear-gradient(135deg, #7c3aed, #4c1d95)',
+                      border: 'none', color: '#fff', cursor: 'pointer', fontWeight: 600, fontSize: 13
+                    }}>
+                      Save Key
+                    </button>
+                  </div>
                 </div>
-              )}
-              <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end' }}>
-                <div style={{ flex: 1, position: 'relative' }}>
-                  <textarea
-                    ref={inputRef} value={input} onChange={handleInputChange}
-                    onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }}
-                    placeholder="Ask about movies, anime, shows..."
-                    rows={1}
-                    style={{
-                      width: '100%', resize: 'none', overflow: 'hidden',
-                      background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)',
-                      borderRadius: 14, padding: '12px 14px', color: '#fff',
-                      fontSize: 13.5, outline: 'none', transition: 'all 0.25s',
-                      lineHeight: 1.5, boxSizing: 'border-box', fontFamily: 'inherit',
-                    }}
-                    onFocus={e => { e.target.style.background = 'rgba(255,255,255,0.07)'; e.target.style.borderColor = 'rgba(124,58,237,0.5)'; e.target.style.boxShadow = '0 0 0 3px rgba(124,58,237,0.08)'; }}
-                    onBlur={e => { e.target.style.background = 'rgba(255,255,255,0.04)'; e.target.style.borderColor = 'rgba(255,255,255,0.1)'; e.target.style.boxShadow = 'none'; }}
-                    onInput={e => { e.target.style.height = 'auto'; e.target.style.height = Math.min(e.target.scrollHeight, 100) + 'px'; }}
-                  />
-                  {input.length > 0 && (
-                    <span style={{
-                      position: 'absolute', bottom: 6, right: 10, fontSize: 10,
-                      color: charCount > MAX_CHARS * 0.8 ? '#f6c90e' : 'rgba(255,255,255,0.2)',
-                    }}>{charCount}/{MAX_CHARS}</span>
+              ) : (
+                <>
+                  {activeMood && (
+                    <div style={{ marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>Mood:</span>
+                      <span style={{
+                        fontSize: 11, padding: '2px 10px', borderRadius: 10,
+                        background: `${MOODS.find(m => m.label === activeMood)?.color}20`,
+                        color: MOODS.find(m => m.label === activeMood)?.color,
+                        border: `1px solid ${MOODS.find(m => m.label === activeMood)?.color}40`,
+                      }}>
+                        {MOODS.find(m => m.label === activeMood)?.emoji} {activeMood}
+                      </span>
+                    </div>
                   )}
-                </div>
-                <button onClick={toggleVoice} style={{
-                  width: 44, height: 44, borderRadius: 12, flexShrink: 0,
-                  background: isListening ? 'rgba(124,58,237,0.2)' : 'rgba(255,255,255,0.04)',
-                  border: isListening ? '1px solid rgba(124,58,237,0.5)' : '1px solid rgba(255,255,255,0.1)',
-                  cursor: 'pointer', color: isListening ? '#7c3aed' : 'rgba(255,255,255,0.4)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.25s',
-                  animation: isListening ? 'statusPulse 1s infinite' : 'none',
-                }}>
-                  {isListening ? <MicOff size={16} /> : <Mic size={16} />}
-                </button>
-                <button onClick={() => send()} disabled={!input.trim() || loading} style={{
-                  width: 44, height: 44, borderRadius: 12, flexShrink: 0,
-                  background: input.trim() && !loading ? 'linear-gradient(135deg, #7c3aed, #4c1d95)' : 'rgba(255,255,255,0.04)',
-                  border: 'none', cursor: input.trim() && !loading ? 'pointer' : 'not-allowed',
-                  color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  boxShadow: input.trim() && !loading ? '0 4px 20px rgba(124,58,237,0.35)' : 'none',
-                  transition: 'all 0.25s',
-                }}
-                  onMouseEnter={e => { if (input.trim() && !loading) e.currentTarget.style.transform = 'scale(1.08)'; }}
-                  onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)'; }}>
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" />
-                  </svg>
-                </button>
-              </div>
+                  <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end' }}>
+                    <div style={{ flex: 1, position: 'relative' }}>
+                      <textarea
+                        ref={inputRef} value={input} onChange={handleInputChange}
+                        onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }}
+                        placeholder="Ask about movies, anime, shows..."
+                        rows={1}
+                        style={{
+                          width: '100%', resize: 'none', overflow: 'hidden',
+                          background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)',
+                          borderRadius: 14, padding: '12px 14px', color: '#fff',
+                          fontSize: 13.5, outline: 'none', transition: 'all 0.25s',
+                          lineHeight: 1.5, boxSizing: 'border-box', fontFamily: 'inherit',
+                        }}
+                        onFocus={e => { e.target.style.background = 'rgba(255,255,255,0.07)'; e.target.style.borderColor = 'rgba(124,58,237,0.5)'; e.target.style.boxShadow = '0 0 0 3px rgba(124,58,237,0.08)'; }}
+                        onBlur={e => { e.target.style.background = 'rgba(255,255,255,0.04)'; e.target.style.borderColor = 'rgba(255,255,255,0.1)'; e.target.style.boxShadow = 'none'; }}
+                        onInput={e => { e.target.style.height = 'auto'; e.target.style.height = Math.min(e.target.scrollHeight, 100) + 'px'; }}
+                      />
+                      {input.length > 0 && (
+                        <span style={{
+                          position: 'absolute', bottom: 6, right: 10, fontSize: 10,
+                          color: charCount > MAX_CHARS * 0.8 ? '#f6c90e' : 'rgba(255,255,255,0.2)',
+                        }}>{charCount}/{MAX_CHARS}</span>
+                      )}
+                    </div>
+                    <button onClick={toggleVoice} style={{
+                      width: 44, height: 44, borderRadius: 12, flexShrink: 0,
+                      background: isListening ? 'rgba(124,58,237,0.2)' : 'rgba(255,255,255,0.04)',
+                      border: isListening ? '1px solid rgba(124,58,237,0.5)' : '1px solid rgba(255,255,255,0.1)',
+                      cursor: 'pointer', color: isListening ? '#7c3aed' : 'rgba(255,255,255,0.4)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.25s',
+                      animation: isListening ? 'statusPulse 1s infinite' : 'none',
+                    }}>
+                      {isListening ? <MicOff size={16} /> : <Mic size={16} />}
+                    </button>
+                    <button onClick={() => send()} disabled={!input.trim() || loading} style={{
+                      width: 44, height: 44, borderRadius: 12, flexShrink: 0,
+                      background: input.trim() && !loading ? 'linear-gradient(135deg, #7c3aed, #4c1d95)' : 'rgba(255,255,255,0.04)',
+                      border: 'none', cursor: input.trim() && !loading ? 'pointer' : 'not-allowed',
+                      color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      boxShadow: input.trim() && !loading ? '0 4px 20px rgba(124,58,237,0.35)' : 'none',
+                      transition: 'all 0.25s',
+                    }}
+                      onMouseEnter={e => { if (input.trim() && !loading) e.currentTarget.style.transform = 'scale(1.08)'; }}
+                      onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)'; }}>
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" />
+                      </svg>
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           </>
         )}

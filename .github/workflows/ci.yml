@@ -1,0 +1,51 @@
+name: Netflix Clone Enterprise Pipeline
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        node-version: [18.x]
+
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v3
+
+    - name: Setup Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v3
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'npm'
+
+    - name: Install Frontend Dependencies
+      run: npm install
+
+    - name: Build Frontend (Vite)
+      run: npm run build
+
+    - name: Install Backend Dependencies
+      working-directory: ./server
+      run: npm install
+
+    - name: Run Jest Unit & Integration Tests
+      working-directory: ./server
+      run: node --experimental-vm-modules node_modules/jest/bin/jest.js --passWithNoTests
+      env:
+        NODE_ENV: test
+        JWT_SECRET: test_secret_123
+
+    - name: Security Audit
+      run: npm audit --audit-level=high
+
+    - name: Run Playwright E2E Tests
+      run: |
+        npm i -D @playwright/test
+        npx playwright install --with-deps
+        # npx playwright test (Commented out until E2E specs are finalized)

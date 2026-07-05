@@ -1,8 +1,6 @@
 import 'dotenv/config';
 import Groq from 'groq-sdk';
 
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
-
 // ─── MOVIE CONTEXT BUILDER ────────────────────────────────────────────────────
 // Takes a reference to the live movie cache and a user query, finds relevant movies
 function buildMovieContext(movieCache, query = '', premiumExclusives = []) {
@@ -88,7 +86,7 @@ function buildMovieContext(movieCache, query = '', premiumExclusives = []) {
 }
 
 // ─── AI CHAT ──────────────────────────────────────────────────────────────────
-async function chatWithAI(movieCache, messages, userMessage, userName = 'User') {
+async function chatWithAI(movieCache, messages, userMessage, userName = 'User', userApiKey = null) {
     const premiumExclusives = [
         { id: 10, title: "Put Your Head on My Shoulder", year: 2019, rating: 8.1, genre: "Romance • Youth", tags: ["C-Drama", "Romance"], desc: "Si Tu Mo's life is shaken up when she's forced to live with a physics genius.", type: "tv" },
         { id: 11, title: "Love is Sweet", year: 2020, rating: 8.4, genre: "Romance • Business", tags: ["C-Drama", "Romance"], desc: "Jiang Jun meets her childhood playmate in the workplace, as a rival.", type: "tv" },
@@ -121,7 +119,15 @@ Style: Short, sharp, premium. Always **bold** recommended titles.`;
 
     try {
         console.log(`[AI] Request from ${userName}: "${userMessage}"`);
-        const chatCompletion = await groq.chat.completions.create({
+        
+        const keyToUse = userApiKey || process.env.GROQ_API_KEY;
+        if (!keyToUse) {
+            throw new Error('No Groq API key found. Please add your key in Settings.');
+        }
+        
+        const groqClient = new Groq({ apiKey: keyToUse });
+        
+        const chatCompletion = await groqClient.chat.completions.create({
             messages: [
                 { role: 'system', content: systemPrompt },
                 ...(messages || []).slice(-8).map(m => ({
