@@ -966,11 +966,11 @@ const start = async () => {
   }
 };
 
-// ONLY START IF RUN DIRECTLY (Not via Vercel/Tests)
-if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
+// ONLY START IF RUN DIRECTLY (Not via Serverless Vercel)
+if (!process.env.VERCEL) {
   start();
 } else {
-  // If in production/vercel, just connect DB
+  // If in vercel serverless, just connect DB
   connectDB().catch(console.error);
 }
 
