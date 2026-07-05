@@ -3,6 +3,11 @@ import User from './models/User.js';
 
 // ─── CONNECT TO MONGODB ──────────────────────────────────────────────────────
 export async function connectDB() {
+  if (process.env.NODE_ENV === 'test') {
+    console.log('🧪 Skipping MongoDB connection in test environment');
+    return;
+  }
+
   const uri = process.env.MONGODB_URI;
   if (!uri) {
     console.error('❌ MONGODB_URI is missing in .env — cannot connect.');
