@@ -1,7 +1,7 @@
 import { io } from 'socket.io-client';
 
-const BASE = 'http://localhost:5000/api';
-export const socket = io('http://localhost:5000');
+const BASE = 'https://netflix-backend-n0s4.onrender.com/api';
+export const socket = io('https://netflix-backend-n0s4.onrender.com');
 
 // Tracking Helpers
 export const trackLogin = (user) => socket.emit('user_login', { user });

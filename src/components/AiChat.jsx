@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { X, Mic, MicOff, Trash2, Copy, Check, ChevronDown, Sparkles, RefreshCw } from 'lucide-react';
 
 // Use absolute URL for reliable backend connectivity
-const API_BASE = 'http://localhost:5000/api';
+const API_BASE = 'https://netflix-backend-n0s4.onrender.com/api';
 
 async function sendAIMessage(messages, message, userName, apiKey) {
   const res = await fetch(`${API_BASE}/ai/chat`, {

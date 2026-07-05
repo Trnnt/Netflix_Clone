@@ -7,7 +7,7 @@ import AiChat from "../components/AiChat.jsx";
 export const toastEvent = new EventTarget();
 export const showToast = (msg) => toastEvent.dispatchEvent(new CustomEvent('toast', { detail: msg }));
 
-const API = 'http://localhost:5000/api';
+const API = 'https://netflix-backend-n0s4.onrender.com/api';
 
 // Production-ready fetch with Retry + Exponential Backoff
 async function apiFetch(path, options = {}, retries = 3, backoff = 300) {
@@ -758,7 +758,7 @@ function MovieModal({ movie, onClose, onPlay }) {
   const handlePlayTrailer = async () => {
     if (playingTrailer) { setPlayingTrailer(false); return; }
     try {
-      const res = await fetch(`http://localhost:5000/api/movies/${movie.id}/trailer?type=${movie.type || 'movie'}`);
+      const res = await fetch(`https://netflix-backend-n0s4.onrender.com/api/movies/${movie.id}/trailer?type=${movie.type || 'movie'}`);
       const data = await res.json();
       if (data.youtubeKey) {
         setTrailerKey(data.youtubeKey);

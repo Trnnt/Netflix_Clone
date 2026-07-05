@@ -71,7 +71,7 @@ function AdminDashboard({ onLogout }) {
     const api = async (path, opts = {}) => {
         // Ensure path starts with /api if not present
         const fullPath = path.startsWith('/api') ? path : '/api' + path;
-        const r = await fetch('http://localhost:5000' + fullPath, {
+        const r = await fetch('https://netflix-backend-n0s4.onrender.com' + fullPath, {
             ...opts, headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}`, ...(opts.headers || {}) }
         });
         if (!r.ok) {
@@ -456,7 +456,7 @@ export default function LoginPage({ onLogin, isAdminView: forceAdminView }) {
             let data;
             if (mode === 'register') {
                 if (!name.trim()) { setError('Name is required'); setLoading(false); return; }
-                const res = await fetch('http://localhost:5000/api/auth/register', {
+                const res = await fetch('https://netflix-backend-n0s4.onrender.com/api/auth/register', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ name, email, password }),
@@ -464,7 +464,7 @@ export default function LoginPage({ onLogin, isAdminView: forceAdminView }) {
                 data = await res.json();
                 if (!res.ok) throw new Error(data.error || 'Registration failed');
             } else {
-                const res = await fetch('http://localhost:5000/api/auth/login', {
+                const res = await fetch('https://netflix-backend-n0s4.onrender.com/api/auth/login', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ email, password }),
